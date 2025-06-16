@@ -640,7 +640,7 @@ class ChatApp {
         
         messageDiv.innerHTML = `
             <img src="${message.user.avatar || 'assets/images/default-avatar.png'}" 
-                 alt="${message.user.username}" class="message-avatar">
+                alt="${message.user.username}" class="message-avatar">
             <div class="message-content">
                 <div class="message-header">
                     <span class="message-username">${message.user.username}</span>
