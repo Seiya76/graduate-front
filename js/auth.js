@@ -1,5 +1,7 @@
 // AWS Cognito認証クラス
-class Auth {
+import { CognitoUserPool, CognitoUser, AuthenticationDetails, CognitoUserAttribute } from 'amazon-cognito-identity-js';
+
+class CognitoAuth {
     constructor() {
         this.userPool = null;
         this.currentUser = null;
@@ -7,23 +9,34 @@ class Auth {
     }
 
     initializeAuth() {
-        // Cognito User Poolの設定
+        // 環境変数からCognito User Poolの設定を取得
         const poolData = {
-            UserPoolId: 'your-user-pool-id', // 実際のUser Pool IDに置き換え
-            ClientId: 'your-client-id' // 実際のClient IDに置き換え
+            UserPoolId: process.env.REACT_APP_USER_POOL_ID,
+            ClientId: process.env.REACT_APP_USER_POOL_CLIENT_ID
         };
         
-        this.userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
+        // 環境変数の値をチェック
+        if (!poolData.UserPoolId || !poolData.ClientId) {
+            console.error('Cognito configuration is missing. Please check your environment variables.');
+            return;
+        }
+        
+        this.userPool = new CognitoUserPool(poolData);
     }
 
     // サインアップ
     async signUp({ username, password, attributes }) {
         return new Promise((resolve, reject) => {
+            if (!this.userPool) {
+                reject(new Error('User pool not initialized'));
+                return;
+            }
+
             const attributeList = [];
             
             // 属性をCognitoAttribute形式に変換
             for (const key in attributes) {
-                const attribute = new AmazonCognitoIdentity.CognitoUserAttribute({
+                const attribute = new CognitoUserAttribute({
                     Name: key,
                     Value: attributes[key]
                 });
@@ -43,12 +56,17 @@ class Auth {
     // メール認証確認
     async confirmSignUp(username, confirmationCode) {
         return new Promise((resolve, reject) => {
+            if (!this.userPool) {
+                reject(new Error('User pool not initialized'));
+                return;
+            }
+
             const userData = {
                 Username: username,
                 Pool: this.userPool
             };
             
-            const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+            const cognitoUser = new CognitoUser(userData);
             
             cognitoUser.confirmRegistration(confirmationCode, true, (err, result) => {
                 if (err) {
@@ -63,19 +81,24 @@ class Auth {
     // サインイン
     async signIn(username, password) {
         return new Promise((resolve, reject) => {
+            if (!this.userPool) {
+                reject(new Error('User pool not initialized'));
+                return;
+            }
+
             const authenticationData = {
                 Username: username,
                 Password: password
             };
             
-            const authenticationDetails = new AmazonCognitoIdentity.AuthenticationDetails(authenticationData);
+            const authenticationDetails = new AuthenticationDetails(authenticationData);
             
             const userData = {
                 Username: username,
                 Pool: this.userPool
             };
             
-            const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+            const cognitoUser = new CognitoUser(userData);
             
             cognitoUser.authenticateUser(authenticationDetails, {
                 onSuccess: (result) => {
@@ -96,13 +119,17 @@ class Auth {
                     // ユーザー属性を取得
                     this.getUserAttributes(cognitoUser).then(attributes => {
                         const userWithAttributes = {
-                            ...cognitoUser,
-                            attributes: this.parseAttributes(attributes)
+                            cognitoUser,
+                            attributes: this.parseAttributes(attributes),
+                            tokens: { accessToken, idToken, refreshToken }
                         };
                         resolve(userWithAttributes);
                     }).catch(err => {
                         // 属性取得に失敗してもサインインは成功とする
-                        resolve(cognitoUser);
+                        resolve({
+                            cognitoUser,
+                            tokens: { accessToken, idToken, refreshToken }
+                        });
                     });
                 },
                 onFailure: (err) => {
@@ -110,7 +137,42 @@ class Auth {
                 },
                 newPasswordRequired: (userAttributes, requiredAttributes) => {
                     // 初回ログイン時の新パスワード設定が必要な場合
-                    reject(new Error('NEW_PASSWORD_REQUIRED'));
+                    const error = new Error('NEW_PASSWORD_REQUIRED');
+                    error.userAttributes = userAttributes;
+                    error.requiredAttributes = requiredAttributes;
+                    error.cognitoUser = cognitoUser;
+                    reject(error);
+                }
+            });
+        });
+    }
+
+    // 新しいパスワードを設定（初回ログイン時）
+    async completeNewPasswordChallenge(cognitoUser, newPassword, requiredAttributes = {}) {
+        return new Promise((resolve, reject) => {
+            cognitoUser.completeNewPasswordChallenge(newPassword, requiredAttributes, {
+                onSuccess: (result) => {
+                    this.currentUser = cognitoUser;
+                    
+                    // JWT トークンを取得
+                    const accessToken = result.getAccessToken().getJwtToken();
+                    const idToken = result.getIdToken().getJwtToken();
+                    const refreshToken = result.getRefreshToken().getToken();
+                    
+                    // トークンをローカルストレージに保存
+                    this.storeTokens({
+                        accessToken,
+                        idToken,
+                        refreshToken
+                    });
+                    
+                    resolve({
+                        cognitoUser,
+                        tokens: { accessToken, idToken, refreshToken }
+                    });
+                },
+                onFailure: (err) => {
+                    reject(err);
                 }
             });
         });
@@ -129,7 +191,7 @@ class Auth {
         });
     }
 
-    // 属性配列を オブジェクトに変換
+    // 属性配列をオブジェクトに変換
     parseAttributes(attributes) {
         const parsed = {};
         attributes.forEach(attr => {
@@ -141,6 +203,11 @@ class Auth {
     // 現在のユーザーを取得
     async getCurrentUser() {
         return new Promise((resolve, reject) => {
+            if (!this.userPool) {
+                reject(new Error('User pool not initialized'));
+                return;
+            }
+
             const cognitoUser = this.userPool.getCurrentUser();
             
             if (cognitoUser != null) {
@@ -156,12 +223,16 @@ class Auth {
                         // ユーザー属性を取得
                         this.getUserAttributes(cognitoUser).then(attributes => {
                             const userWithAttributes = {
-                                ...cognitoUser,
-                                attributes: this.parseAttributes(attributes)
+                                cognitoUser,
+                                attributes: this.parseAttributes(attributes),
+                                session
                             };
                             resolve(userWithAttributes);
                         }).catch(err => {
-                            resolve(cognitoUser);
+                            resolve({
+                                cognitoUser,
+                                session
+                            });
                         });
                     } else {
                         reject(new Error('Session is not valid'));
@@ -176,6 +247,11 @@ class Auth {
     // 現在のセッションを取得
     async currentSession() {
         return new Promise((resolve, reject) => {
+            if (!this.userPool) {
+                reject(new Error('User pool not initialized'));
+                return;
+            }
+
             const cognitoUser = this.userPool.getCurrentUser();
             
             if (cognitoUser != null) {
@@ -200,6 +276,12 @@ class Auth {
     // サインアウト
     async signOut() {
         return new Promise((resolve, reject) => {
+            if (!this.userPool) {
+                this.clearTokens();
+                resolve();
+                return;
+            }
+
             const cognitoUser = this.userPool.getCurrentUser();
             
             if (cognitoUser != null) {
@@ -215,15 +297,41 @@ class Auth {
         });
     }
 
+    // グローバルサインアウト（すべてのデバイスからサインアウト）
+    async globalSignOut() {
+        return new Promise((resolve, reject) => {
+            if (!this.currentUser) {
+                reject(new Error('No authenticated user'));
+                return;
+            }
+            
+            this.currentUser.globalSignOut({
+                onSuccess: () => {
+                    this.currentUser = null;
+                    this.clearTokens();
+                    resolve();
+                },
+                onFailure: (err) => {
+                    reject(err);
+                }
+            });
+        });
+    }
+
     // パスワードリセット要求
     async forgotPassword(username) {
         return new Promise((resolve, reject) => {
+            if (!this.userPool) {
+                reject(new Error('User pool not initialized'));
+                return;
+            }
+
             const userData = {
                 Username: username,
                 Pool: this.userPool
             };
             
-            const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+            const cognitoUser = new CognitoUser(userData);
             
             cognitoUser.forgotPassword({
                 onSuccess: (result) => {
@@ -239,12 +347,17 @@ class Auth {
     // パスワードリセット確認
     async confirmPassword(username, confirmationCode, newPassword) {
         return new Promise((resolve, reject) => {
+            if (!this.userPool) {
+                reject(new Error('User pool not initialized'));
+                return;
+            }
+
             const userData = {
                 Username: username,
                 Pool: this.userPool
             };
             
-            const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+            const cognitoUser = new CognitoUser(userData);
             
             cognitoUser.confirmPassword(confirmationCode, newPassword, {
                 onSuccess: () => {
@@ -285,7 +398,7 @@ class Auth {
             
             const attributeList = [];
             for (const key in attributes) {
-                const attribute = new AmazonCognitoIdentity.CognitoUserAttribute({
+                const attribute = new CognitoUserAttribute({
                     Name: key,
                     Value: attributes[key]
                 });
@@ -293,6 +406,24 @@ class Auth {
             }
             
             this.currentUser.updateAttributes(attributeList, (err, result) => {
+                if (err) {
+                    reject(err);
+                    return;
+                }
+                resolve(result);
+            });
+        });
+    }
+
+    // ユーザー属性削除
+    async deleteUserAttributes(attributeNames) {
+        return new Promise((resolve, reject) => {
+            if (!this.currentUser) {
+                reject(new Error('No authenticated user'));
+                return;
+            }
+            
+            this.currentUser.deleteAttributes(attributeNames, (err, result) => {
                 if (err) {
                     reject(err);
                     return;
@@ -311,6 +442,11 @@ class Auth {
     async getAccessToken() {
         const session = await this.currentSession();
         return session.getAccessToken().getJwtToken();
+    }
+
+    async getRefreshToken() {
+        const session = await this.currentSession();
+        return session.getRefreshToken().getToken();
     }
 
     // トークンをローカルストレージに保存
@@ -355,6 +491,11 @@ class Auth {
     // セッションを更新
     async refreshSession() {
         return new Promise((resolve, reject) => {
+            if (!this.userPool) {
+                reject(new Error('User pool not initialized'));
+                return;
+            }
+
             const cognitoUser = this.userPool.getCurrentUser();
             
             if (cognitoUser != null) {
@@ -365,6 +506,17 @@ class Auth {
                     }
                     
                     if (session.isValid()) {
+                        // セッションの有効期限を更新
+                        const accessToken = session.getAccessToken().getJwtToken();
+                        const idToken = session.getIdToken().getJwtToken();
+                        const refreshToken = session.getRefreshToken().getToken();
+                        
+                        this.storeTokens({
+                            accessToken,
+                            idToken,
+                            refreshToken
+                        });
+                        
                         resolve(session);
                     } else {
                         // リフレッシュトークンを使用してセッションを更新
@@ -374,6 +526,18 @@ class Auth {
                                 reject(err);
                                 return;
                             }
+                            
+                            // 新しいトークンを保存
+                            const accessToken = session.getAccessToken().getJwtToken();
+                            const idToken = session.getIdToken().getJwtToken();
+                            const newRefreshToken = session.getRefreshToken().getToken();
+                            
+                            this.storeTokens({
+                                accessToken,
+                                idToken,
+                                refreshToken: newRefreshToken
+                            });
+                            
                             resolve(session);
                         });
                     }
@@ -383,7 +547,29 @@ class Auth {
             }
         });
     }
+
+    // ユーザーアカウント削除
+    async deleteUser() {
+        return new Promise((resolve, reject) => {
+            if (!this.currentUser) {
+                reject(new Error('No authenticated user'));
+                return;
+            }
+            
+            this.currentUser.deleteUser((err, result) => {
+                if (err) {
+                    reject(err);
+                    return;
+                }
+                
+                this.currentUser = null;
+                this.clearTokens();
+                resolve(result);
+            });
+        });
+    }
 }
 
-// グローバルインスタンスを作成
-const Auth = new Auth();
+// シングルトンインスタンスを作成してエクスポート
+const auth = new CognitoAuth();
+export default auth;
