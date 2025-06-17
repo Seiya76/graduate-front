@@ -1,5 +1,6 @@
 // AWS Cognito認証クラス
 import { CognitoUserPool, CognitoUser, AuthenticationDetails, CognitoUserAttribute } from 'amazon-cognito-identity-js';
+import { Amplify } from 'aws-amplify';
 
 class CognitoAuth {
     constructor() {
@@ -9,15 +10,33 @@ class CognitoAuth {
     }
 
     initializeAuth() {
-        // 環境変数からCognito User Poolの設定を取得
-        const poolData = {
-            UserPoolId: process.env.REACT_APP_USER_POOL_ID,
-            ClientId: process.env.REACT_APP_USER_POOL_CLIENT_ID
-        };
+        // Amplifyの設定から取得するか、環境変数から取得
+        let poolData;
+        
+        try {
+            // Amplifyの設定から取得を試行
+            const amplifyConfig = Amplify.getConfig();
+            if (amplifyConfig.Auth?.Cognito) {
+                poolData = {
+                    UserPoolId: amplifyConfig.Auth.Cognito.userPoolId,
+                    ClientId: amplifyConfig.Auth.Cognito.userPoolClientId
+                };
+            }
+        } catch (error) {
+            console.log('Amplify config not available, using environment variables');
+        }
+        
+        // Amplifyの設定が利用できない場合は環境変数を使用
+        if (!poolData || !poolData.UserPoolId || !poolData.ClientId) {
+            poolData = {
+                UserPoolId: process.env.REACT_APP_USER_POOL_ID,
+                ClientId: process.env.REACT_APP_USER_POOL_CLIENT_ID
+            };
+        }
         
         // 環境変数の値をチェック
         if (!poolData.UserPoolId || !poolData.ClientId) {
-            console.error('Cognito configuration is missing. Please check your environment variables.');
+            console.error('Cognito configuration is missing. Please check your environment variables or Amplify setup.');
             return;
         }
         
