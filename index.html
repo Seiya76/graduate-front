@@ -113,6 +113,18 @@
     <!-- トースト通知 -->
     <div id="toast-container" class="toast-container"></div>
 
+    // add sign-in button
+    <div>
+        <button id="signIn">Sign In</button>
+    </div>
+
+    <script type="module">
+        import { userManager } from "/js/auth.js";
+
+        document.getElementById("signIn").addEventListener("click", async () => {
+            await userManager.signinRedirect();
+        });
+    </script>
     <!-- AWS SDK and Amplify -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/aws-sdk/2.1479.0/aws-sdk.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/amazon-cognito-identity-js/6.3.7/amazon-cognito-identity.min.js"></script>
