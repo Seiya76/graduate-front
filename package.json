@@ -1,5 +1,5 @@
 {
-    "name": "my-amplify-app",
+    "name": "amplify-app",
     "version": "0.1.0",
     "type": "module",
     "private": true,
@@ -20,4 +20,4 @@
         "test": "react-scripts test",
         "eject": "react-scripts eject"
     }
-}
+} 
