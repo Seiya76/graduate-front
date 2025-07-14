@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>認証コールバック</title>
+</head>
+<body>
+    <div>
+        Hello: <pre id="email"></pre>
+        Access token: <pre id="access-token"></pre>
+        ID token: <pre id="id-token"></pre>
+        Refresh token: <pre id="refresh-token"></pre>
+    </div>
+
+    <script type="module">
+        import { userManager } from "./main.js";
+        
+        userManager.signinCallback().then(function (user) {
+            document.getElementById("email").textContent = user.profile?.email;
+            document.getElementById("access-token").textContent = user.access_token;
+            document.getElementById("id-token").textContent = user.id_token;
+            document.getElementById("refresh-token").textContent = user.refresh_token;
+        }).catch(function (error) {
+            console.error("認証エラー:", error);
+        });
+    </script>
+</body>
+</html>

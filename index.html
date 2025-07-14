@@ -13,49 +13,45 @@
 
     <!-- 認証後の情報表示 -->
     <div id="user-info" style="display: none;">
+        <h2>認証成功</h2>
         Hello: <pre id="email"></pre>
         Access token: <pre id="access-token"></pre>
         ID token: <pre id="id-token"></pre>
         Refresh token: <pre id="refresh-token"></pre>
+        <button id="signOut">Sign Out</button>
     </div>
 
     <script type="module">
         import { userManager } from "graduate-front\amplify\auth\auth.ts";
         
-        // ページ読み込み時の処理
-        window.addEventListener('DOMContentLoaded', async () => {
-            // URLパラメータをチェックして認証コールバックかどうか判定
-            const urlParams = new URLSearchParams(window.location.search);
-            
-            if (urlParams.has('code') || urlParams.has('state')) {
-                // 認証コールバック処理
-                try {
-                    const user = await userManager.signinCallback();
-                    displayUserInfo(user);
-                } catch (error) {
-                    console.error("認証エラー:", error);
-                }
-            } else {
-                // 通常のページ表示
-                document.getElementById("signin-section").style.display = "block";
-            }
-        });
-
-        // サインインボタンのクリックイベント
-        document.getElementById("signIn").addEventListener("click", async () => {
-            await userManager.signinRedirect();
-        });
-
-        // ユーザー情報を表示する関数
-        function displayUserInfo(user) {
-            document.getElementById("signin-section").style.display = "none";
-            document.getElementById("user-info").style.display = "block";
-            
-            document.getElementById("email").textContent = user.profile?.email;
-            document.getElementById("access-token").textContent = user.access_token;
-            document.getElementById("id-token").textContent = user.id_token;
-            document.getElementById("refresh-token").textContent = user.refresh_token;
+        // URLにコールバック用のパラメータがあるかチェック
+        if (window.location.search.includes('code=') || window.location.search.includes('error=')) {
+            // コールバック処理
+            userManager.signinCallback().then(function (user) {
+                document.getElementById("signin-section").style.display = "none";
+                document.getElementById("user-info").style.display = "block";
+                
+                document.getElementById("email").textContent = user.profile?.email;
+                document.getElementById("access-token").textContent = user.access_token;
+                document.getElementById("id-token").textContent = user.id_token;
+                document.getElementById("refresh-token").textContent = user.refresh_token;
+                
+                // URLからパラメータを削除
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }).catch(function (error) {
+                console.error("認証エラー:", error);
+            });
+        } else {
+            // 通常のサインイン処理
+            document.getElementById("signIn").addEventListener("click", async () => {
+                await userManager.signinRedirect();
+            });
         }
+        
+        // サインアウト処理
+        document.getElementById("signOut").addEventListener("click", async () => {
+            await userManager.signoutRedirect();
+        });
     </script>
 </body>
 </html>
