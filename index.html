@@ -3,126 +3,540 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat App</title>
-    <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/components.css">
+    <title>Amazon Cognito with Vanilla JavaScript</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        .success {
+            color: #155724;
+            background-color: #d4edda;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        .hidden {
+            display: none;
+        }
+        .user-info {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        .nav-buttons {
+            margin-bottom: 20px;
+        }
+        .nav-buttons button {
+            background-color: #6c757d;
+        }
+        .nav-buttons button.active {
+            background-color: #007bff;
+        }
+    </style>
 </head>
 <body>
-    <!-- メインアプリケーション -->
-    <div id="app-container">
-        <!-- ヘッダー -->
-        <header class="app-header">
-            <div class="header-left">
-                <h1>Chat App</h1>
-            </div>
-            <div class="header-right">
-                <div class="user-info">
-                    <img id="user-avatar" src="assets/images/default-avatar.png" alt="User Avatar" class="user-avatar">
-                    <span id="username">ユーザー名</span>
-                    <button id="logout-btn" class="btn btn-secondary">ログアウト</button>
-                </div>
-            </div>
-        </header>
-
-        <div class="app-body">
-            <!-- サイドバー（ルーム一覧） -->
-            <aside class="sidebar">
-                <div class="sidebar-header">
-                    <h3>チャットルーム</h3>
-                    <button id="create-room-btn" class="btn btn-small">+</button>
-                </div>
-                <div class="room-search">
-                    <input type="text" id="room-search" placeholder="ルームを検索...">
-                </div>
-                <div id="rooms-list" class="rooms-list">
-                    <!-- ルーム一覧がここに動的に挿入される -->
-                </div>
-            </aside>
-
-            <!-- メインチャットエリア -->
-            <main class="main-content">
-                <div id="welcome-screen" class="welcome-screen">
-                    <h2>チャットルームを選択してください</h2>
-                    <p>左側のルーム一覧からチャットを開始しましょう</p>
-                </div>
-
-                <div id="chat-container" class="chat-container" style="display: none;">
-                    <!-- チャットヘッダー -->
-                    <div class="chat-header">
-                        <div class="chat-info">
-                            <h3 id="current-room-name">ルーム名</h3>
-                            <span id="room-members-count">メンバー: 0人</span>
-                        </div>
-                        <div class="chat-actions">
-                            <button id="room-settings-btn" class="btn btn-icon">⚙️</button>
-                        </div>
-                    </div>
-
-                    <!-- メッセージエリア -->
-                    <div id="messages-container" class="messages-container">
-                        <!-- メッセージがここに動的に挿入される -->
-                    </div>
-
-                    <!-- メッセージ入力エリア -->
-                    <div class="message-input-area">
-                        <form id="message-form" class="message-form">
-                            <input type="file" id="file-input" accept="image/*,*" style="display: none;">
-                            <button type="button" id="attach-btn" class="btn btn-icon">📎</button>
-                            <input type="text" id="message-input" placeholder="メッセージを入力..." class="message-input">
-                            <button type="submit" id="send-btn" class="btn btn-primary">送信</button>
-                        </form>
-                    </div>
-                </div>
-            </main>
+    <div class="container">
+        <h1>Amazon Cognito 認証デモ</h1>
+        
+        <div class="nav-buttons">
+            <button id="showSignIn" class="active">サインイン</button>
+            <button id="showSignUp">サインアップ</button>
+            <button id="showConfirm" class="hidden">確認</button>
+            <button id="showProfile" class="hidden">プロフィール</button>
         </div>
-    </div>
 
-    <!-- モーダル: 新規ルーム作成 -->
-    <div id="create-room-modal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>新しいルームを作成</h3>
-                <span class="close" id="close-modal">&times;</span>
-            </div>
-            <form id="create-room-form">
-                <div class="input-group">
-                    <label for="room-name">ルーム名</label>
-                    <input type="text" id="room-name" required>
+        <div id="messages"></div>
+
+        <!-- サインインフォーム -->
+        <div id="signInForm">
+            <h2>サインイン</h2>
+            <form id="signInFormElement">
+                <div class="form-group">
+                    <label for="signInUsername">ユーザー名またはメール:</label>
+                    <input type="text" id="signInUsername" required>
                 </div>
-                <div class="input-group">
-                    <label for="room-type">ルームタイプ</label>
-                    <select id="room-type">
-                        <option value="GROUP">グループ</option>
-                        <option value="DIRECT">ダイレクト</option>
-                    </select>
+                <div class="form-group">
+                    <label for="signInPassword">パスワード:</label>
+                    <input type="password" id="signInPassword" required>
                 </div>
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" id="cancel-create">キャンセル</button>
-                    <button type="submit" class="btn btn-primary">作成</button>
+                <button type="submit">サインイン</button>
+                <button type="button" id="forgotPasswordBtn">パスワードを忘れた場合</button>
+            </form>
+        </div>
+
+        <!-- サインアップフォーム -->
+        <div id="signUpForm" class="hidden">
+            <h2>サインアップ</h2>
+            <form id="signUpFormElement">
+                <div class="form-group">
+                    <label for="signUpUsername">ユーザー名:</label>
+                    <input type="text" id="signUpUsername" required>
                 </div>
+                <div class="form-group">
+                    <label for="signUpEmail">メールアドレス:</label>
+                    <input type="email" id="signUpEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="signUpPassword">パスワード:</label>
+                    <input type="password" id="signUpPassword" required>
+                </div>
+                <div class="form-group">
+                    <label for="signUpPhone">電話番号 (オプション):</label>
+                    <input type="tel" id="signUpPhone" placeholder="+81901234567">
+                </div>
+                <button type="submit">サインアップ</button>
+            </form>
+        </div>
+
+        <!-- 確認フォーム -->
+        <div id="confirmForm" class="hidden">
+            <h2>メール確認</h2>
+            <form id="confirmFormElement">
+                <div class="form-group">
+                    <label for="confirmUsername">ユーザー名:</label>
+                    <input type="text" id="confirmUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="confirmCode">確認コード:</label>
+                    <input type="text" id="confirmCode" required>
+                </div>
+                <button type="submit">確認</button>
+                <button type="button" id="resendCodeBtn">コードを再送信</button>
+            </form>
+        </div>
+
+        <!-- プロフィール -->
+        <div id="profileSection" class="hidden">
+            <h2>プロフィール</h2>
+            <div id="userInfo" class="user-info"></div>
+            <button id="signOutBtn">サインアウト</button>
+            <button id="changePasswordBtn">パスワード変更</button>
+            <button id="deleteAccountBtn" style="background-color: #dc3545;">アカウント削除</button>
+        </div>
+
+        <!-- パスワード変更フォーム -->
+        <div id="changePasswordForm" class="hidden">
+            <h2>パスワード変更</h2>
+            <form id="changePasswordFormElement">
+                <div class="form-group">
+                    <label for="oldPassword">現在のパスワード:</label>
+                    <input type="password" id="oldPassword" required>
+                </div>
+                <div class="form-group">
+                    <label for="newPassword">新しいパスワード:</label>
+                    <input type="password" id="newPassword" required>
+                </div>
+                <button type="submit">パスワード変更</button>
+                <button type="button" id="cancelChangePassword">キャンセル</button>
             </form>
         </div>
     </div>
 
-    <!-- ローディング画面 -->
-    <div id="loading" class="loading" style="display: none;">
-        <div class="spinner"></div>
-        <p>読み込み中...</p>
-    </div>
+    <!-- AWS SDK -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aws-sdk/2.1691.0/aws-sdk.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/amazon-cognito-identity-js/6.3.12/amazon-cognito-identity.min.js"></script>
 
-    <!-- トースト通知 -->
-    <div id="toast-container" class="toast-container"></div>
+    <script>
+        // Cognito設定 (実際の値に置き換えてください)
+        const CONFIG = {
+            UserPoolId: 'ap-northeast-1_XXXXXXXXX', // あなたのUser Pool ID
+            ClientId: 'XXXXXXXXXXXXXXXXXXXXXXXXXX', // あなたのClient ID
+            Region: 'ap-northeast-1' // あなたのリージョン
+        };
 
-    <!-- AWS SDK and Amplify -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/aws-sdk/2.1479.0/aws-sdk.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/amazon-cognito-identity-js/6.3.7/amazon-cognito-identity.min.js"></script>
-    
-    <!-- アプリケーションスクリプト -->
-    <script src="js/utils.js"></script>
-    <script src="js/auth.js"></script>
-    <script src="js/chat.js"></script>
-    <script src="js/app.js"></script>
-    <script src="amplify/backend.js"></script>
-    <script src="amplify/auth/resource.js"></script>
+        // AWS Cognito設定
+        AWS.config.region = CONFIG.Region;
+        const userPool = new AmazonCognitoIdentity.CognitoUserPool({
+            UserPoolId: CONFIG.UserPoolId,
+            ClientId: CONFIG.ClientId
+        });
+
+        // DOM要素の取得
+        const elements = {
+            // フォーム
+            signInForm: document.getElementById('signInForm'),
+            signUpForm: document.getElementById('signUpForm'),
+            confirmForm: document.getElementById('confirmForm'),
+            profileSection: document.getElementById('profileSection'),
+            changePasswordForm: document.getElementById('changePasswordForm'),
+            
+            // ナビゲーション
+            showSignIn: document.getElementById('showSignIn'),
+            showSignUp: document.getElementById('showSignUp'),
+            showConfirm: document.getElementById('showConfirm'),
+            showProfile: document.getElementById('showProfile'),
+            
+            // メッセージ
+            messages: document.getElementById('messages'),
+            
+            // その他
+            userInfo: document.getElementById('userInfo')
+        };
+
+        // ユーティリティ関数
+        function showMessage(message, type = 'success') {
+            elements.messages.innerHTML = `<div class="${type}">${message}</div>`;
+            setTimeout(() => {
+                elements.messages.innerHTML = '';
+            }, 5000);
+        }
+
+        function showForm(formName) {
+            // すべてのフォームを非表示
+            document.querySelectorAll('.container > div:not(.nav-buttons):not(#messages)').forEach(el => {
+                el.classList.add('hidden');
+            });
+            
+            // ナビゲーションボタンの状態更新
+            document.querySelectorAll('.nav-buttons button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // 指定されたフォームを表示
+            document.getElementById(formName).classList.remove('hidden');
+            document.getElementById('show' + formName.charAt(0).toUpperCase() + formName.slice(1)).classList.add('active');
+        }
+
+        // サインアップ
+        document.getElementById('signUpFormElement').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('signUpUsername').value;
+            const email = document.getElementById('signUpEmail').value;
+            const password = document.getElementById('signUpPassword').value;
+            const phone = document.getElementById('signUpPhone').value;
+            
+            const attributeList = [
+                new AmazonCognitoIdentity.CognitoUserAttribute({
+                    Name: 'email',
+                    Value: email
+                })
+            ];
+            
+            if (phone) {
+                attributeList.push(new AmazonCognitoIdentity.CognitoUserAttribute({
+                    Name: 'phone_number',
+                    Value: phone
+                }));
+            }
+            
+            try {
+                userPool.signUp(username, password, attributeList, null, (err, result) => {
+                    if (err) {
+                        showMessage(err.message || JSON.stringify(err), 'error');
+                        return;
+                    }
+                    
+                    showMessage('サインアップが完了しました。確認メールをチェックしてください。');
+                    document.getElementById('confirmUsername').value = username;
+                    elements.showConfirm.classList.remove('hidden');
+                    showForm('confirmForm');
+                });
+            } catch (error) {
+                showMessage(error.message, 'error');
+            }
+        });
+
+        // メール確認
+        document.getElementById('confirmFormElement').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('confirmUsername').value;
+            const code = document.getElementById('confirmCode').value;
+            
+            const userData = {
+                Username: username,
+                Pool: userPool
+            };
+            
+            const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+            
+            cognitoUser.confirmRegistration(code, true, (err, result) => {
+                if (err) {
+                    showMessage(err.message || JSON.stringify(err), 'error');
+                    return;
+                }
+                
+                showMessage('メール確認が完了しました。サインインしてください。');
+                showForm('signInForm');
+            });
+        });
+
+        // コード再送信
+        document.getElementById('resendCodeBtn').addEventListener('click', () => {
+            const username = document.getElementById('confirmUsername').value;
+            
+            if (!username) {
+                showMessage('ユーザー名を入力してください。', 'error');
+                return;
+            }
+            
+            const userData = {
+                Username: username,
+                Pool: userPool
+            };
+            
+            const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+            
+            cognitoUser.resendConfirmationCode((err, result) => {
+                if (err) {
+                    showMessage(err.message || JSON.stringify(err), 'error');
+                    return;
+                }
+                
+                showMessage('確認コードを再送信しました。');
+            });
+        });
+
+        // サインイン
+        document.getElementById('signInFormElement').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('signInUsername').value;
+            const password = document.getElementById('signInPassword').value;
+            
+            const authenticationData = {
+                Username: username,
+                Password: password
+            };
+            
+            const authenticationDetails = new AmazonCognitoIdentity.AuthenticationDetails(authenticationData);
+            
+            const userData = {
+                Username: username,
+                Pool: userPool
+            };
+            
+            const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+            
+            cognitoUser.authenticateUser(authenticationDetails, {
+                onSuccess: (result) => {
+                    showMessage('サインインが成功しました。');
+                    loadUserProfile();
+                    elements.showProfile.classList.remove('hidden');
+                    showForm('profileSection');
+                },
+                onFailure: (err) => {
+                    showMessage(err.message || JSON.stringify(err), 'error');
+                }
+            });
+        });
+
+        // プロフィール読み込み
+        function loadUserProfile() {
+            const cognitoUser = userPool.getCurrentUser();
+            
+            if (cognitoUser) {
+                cognitoUser.getSession((err, session) => {
+                    if (err) {
+                        showMessage(err.message || JSON.stringify(err), 'error');
+                        return;
+                    }
+                    
+                    if (session.isValid()) {
+                        cognitoUser.getUserAttributes((err, attributes) => {
+                            if (err) {
+                                showMessage(err.message || JSON.stringify(err), 'error');
+                                return;
+                            }
+                            
+                            let userInfoHTML = '<h3>ユーザー情報</h3>';
+                            userInfoHTML += `<p><strong>ユーザー名:</strong> ${cognitoUser.username}</p>`;
+                            
+                            attributes.forEach(attribute => {
+                                userInfoHTML += `<p><strong>${attribute.getName()}:</strong> ${attribute.getValue()}</p>`;
+                            });
+                            
+                            elements.userInfo.innerHTML = userInfoHTML;
+                        });
+                    }
+                });
+            }
+        }
+
+        // サインアウト
+        document.getElementById('signOutBtn').addEventListener('click', () => {
+            const cognitoUser = userPool.getCurrentUser();
+            
+            if (cognitoUser) {
+                cognitoUser.signOut();
+                showMessage('サインアウトしました。');
+                elements.showProfile.classList.add('hidden');
+                elements.showConfirm.classList.add('hidden');
+                showForm('signInForm');
+            }
+        });
+
+        // パスワード変更
+        document.getElementById('changePasswordBtn').addEventListener('click', () => {
+            showForm('changePasswordForm');
+        });
+
+        document.getElementById('changePasswordFormElement').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const oldPassword = document.getElementById('oldPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            
+            const cognitoUser = userPool.getCurrentUser();
+            
+            if (cognitoUser) {
+                cognitoUser.getSession((err, session) => {
+                    if (err) {
+                        showMessage(err.message || JSON.stringify(err), 'error');
+                        return;
+                    }
+                    
+                    cognitoUser.changePassword(oldPassword, newPassword, (err, result) => {
+                        if (err) {
+                            showMessage(err.message || JSON.stringify(err), 'error');
+                            return;
+                        }
+                        
+                        showMessage('パスワードが変更されました。');
+                        showForm('profileSection');
+                    });
+                });
+            }
+        });
+
+        document.getElementById('cancelChangePassword').addEventListener('click', () => {
+            showForm('profileSection');
+        });
+
+        // アカウント削除
+        document.getElementById('deleteAccountBtn').addEventListener('click', () => {
+            if (confirm('本当にアカウントを削除しますか？この操作は取り消せません。')) {
+                const cognitoUser = userPool.getCurrentUser();
+                
+                if (cognitoUser) {
+                    cognitoUser.getSession((err, session) => {
+                        if (err) {
+                            showMessage(err.message || JSON.stringify(err), 'error');
+                            return;
+                        }
+                        
+                        cognitoUser.deleteUser((err, result) => {
+                            if (err) {
+                                showMessage(err.message || JSON.stringify(err), 'error');
+                                return;
+                            }
+                            
+                            showMessage('アカウントが削除されました。');
+                            elements.showProfile.classList.add('hidden');
+                            elements.showConfirm.classList.add('hidden');
+                            showForm('signInForm');
+                        });
+                    });
+                }
+            }
+        });
+
+        // パスワードリセット
+        document.getElementById('forgotPasswordBtn').addEventListener('click', () => {
+            const username = document.getElementById('signInUsername').value;
+            
+            if (!username) {
+                showMessage('ユーザー名を入力してください。', 'error');
+                return;
+            }
+            
+            const userData = {
+                Username: username,
+                Pool: userPool
+            };
+            
+            const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+            
+            cognitoUser.forgotPassword({
+                onSuccess: (result) => {
+                    showMessage('パスワードリセットメールを送信しました。');
+                },
+                onFailure: (err) => {
+                    showMessage(err.message || JSON.stringify(err), 'error');
+                }
+            });
+        });
+
+        // ナビゲーション
+        elements.showSignIn.addEventListener('click', () => showForm('signInForm'));
+        elements.showSignUp.addEventListener('click', () => showForm('signUpForm'));
+        elements.showConfirm.addEventListener('click', () => showForm('confirmForm'));
+        elements.showProfile.addEventListener('click', () => showForm('profileSection'));
+
+        // ページロード時に現在のユーザーをチェック
+        window.addEventListener('load', () => {
+            const cognitoUser = userPool.getCurrentUser();
+            
+            if (cognitoUser) {
+                cognitoUser.getSession((err, session) => {
+                    if (err) {
+                        console.log('セッションエラー:', err);
+                        return;
+                    }
+                    
+                    if (session.isValid()) {
+                        loadUserProfile();
+                        elements.showProfile.classList.remove('hidden');
+                        showForm('profileSection');
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 </html>
