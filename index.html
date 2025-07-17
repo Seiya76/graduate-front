@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ログイン</title>
+    <title>Amazon Cognito認証システム</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aws-sdk/2.1691.0/aws-sdk.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/amazon-cognito-identity-js/6.3.12/amazon-cognito-identity.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -12,7 +14,7 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
@@ -21,266 +23,765 @@
             padding: 20px;
         }
 
-        .login-container {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
+        .auth-container {
+            background: white;
+            border-radius: 16px;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            padding: 40px;
+            overflow: hidden;
             width: 100%;
             max-width: 400px;
-            transform: translateY(0);
-            animation: slideIn 0.6s ease-out;
+            min-height: 500px;
         }
 
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .logo {
+        .auth-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
             text-align: center;
-            margin-bottom: 30px;
         }
 
-        .logo h1 {
-            color: #333;
-            font-size: 2.5em;
-            font-weight: 300;
+        .auth-header h1 {
+            font-size: 24px;
             margin-bottom: 10px;
+            font-weight: 600;
         }
 
-        .logo p {
-            color: #666;
-            font-size: 0.9em;
+        .auth-header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .auth-content {
+            padding: 30px;
         }
 
         .form-group {
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
 
-        .form-group label {
+        label {
             display: block;
             margin-bottom: 8px;
-            color: #333;
             font-weight: 500;
-            font-size: 0.9em;
+            color: #333;
+            font-size: 14px;
         }
 
-        .form-group input {
+        input[type="text"],
+        input[type="email"],
+        input[type="password"],
+        input[type="tel"] {
             width: 100%;
-            padding: 15px;
-            border: 2px solid #e1e1e1;
-            border-radius: 10px;
-            font-size: 16px;
-            transition: all 0.3s ease;
-            background: rgba(255, 255, 255, 0.8);
+            padding: 12px 16px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
         }
 
-        .form-group input:focus {
+        input[type="text"]:focus,
+        input[type="email"]:focus,
+        input[type="password"]:focus,
+        input[type="tel"]:focus {
             outline: none;
             border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-            transform: translateY(-2px);
         }
 
-        .form-group input::placeholder {
-            color: #999;
-        }
-
-        .login-button {
+        .btn {
             width: 100%;
-            padding: 15px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            padding: 14px;
             border: none;
-            border-radius: 10px;
+            border-radius: 8px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
-            margin-top: 10px;
+            margin-bottom: 12px;
         }
 
-        .login-button:hover {
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
         }
 
-        .login-button:active {
-            transform: translateY(0);
+        .btn-primary:disabled {
+            opacity: 0.6;
+            transform: none;
+            cursor: not-allowed;
         }
 
-        .forgot-password {
+        .btn-secondary {
+            background: transparent;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        .btn-secondary:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .form-switch {
             text-align: center;
             margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e1e5e9;
         }
 
-        .forgot-password a {
+        .form-switch a {
             color: #667eea;
             text-decoration: none;
-            font-size: 0.9em;
-            transition: color 0.3s ease;
+            font-weight: 500;
         }
 
-        .forgot-password a:hover {
-            color: #764ba2;
+        .form-switch a:hover {
+            text-decoration: underline;
         }
 
-        .divider {
-            text-align: center;
-            margin: 25px 0;
-            position: relative;
-            color: #666;
-        }
-
-        .divider::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: #e1e1e1;
-        }
-
-        .divider span {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 0 15px;
-            position: relative;
-        }
-
-        .social-login {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
-
-        .social-button {
-            flex: 1;
-            padding: 12px;
-            border: 2px solid #e1e1e1;
+        .alert {
+            padding: 12px 16px;
             border-radius: 8px;
-            background: white;
-            cursor: pointer;
-            transition: all 0.3s ease;
+            margin-bottom: 20px;
             font-size: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
         }
 
-        .social-button:hover {
-            border-color: #667eea;
-            transform: translateY(-1px);
+        .alert-error {
+            background: #fee;
+            color: #c53030;
+            border: 1px solid #fed7d7;
         }
 
-        @media (max-width: 480px) {
-            .login-container {
-                padding: 30px 20px;
-            }
-            
-            .logo h1 {
-                font-size: 2em;
-            }
+        .alert-success {
+            background: #f0fff4;
+            color: #22543d;
+            border: 1px solid #9ae6b4;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .dashboard {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .dashboard h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .user-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .user-info p {
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        .config-section {
+            background: #fff3cd;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #ffeaa7;
+        }
+
+        .config-section h3 {
+            color: #856404;
+            margin-bottom: 15px;
+        }
+
+        .config-section p {
+            color: #856404;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .config-section code {
+            background: #f1f3f4;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
         }
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <div class="logo">
-            <h1>ログイン</h1>
-            <p>アカウントにサインインしてください</p>
-        </div>
-        
-        <form id="loginForm">
+    <div class="auth-container">
+        <!-- 設定セクション -->
+        <div id="config-section" class="config-section">
+            <h3>🔧 Cognito設定が必要です</h3>
+            <p>このデモを使用するには、以下の設定値を入力してください：</p>
             <div class="form-group">
-                <label for="email">メールアドレス</label>
-                <input type="email" id="email" name="email" placeholder="your@email.com" required>
+                <label for="userPoolId">User Pool ID:</label>
+                <input type="text" id="userPoolId" placeholder="us-east-1_xxxxxxxxx">
             </div>
-            
-            <button type="submit" class="login-button">ログイン</button>
-        </form>
-        
-        <div class="forgot-password">
-            <a href="#">パスワードを忘れた場合</a>
+            <div class="form-group">
+                <label for="clientId">Client ID:</label>
+                <input type="text" id="clientId" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxx">
+            </div>
+            <div class="form-group">
+                <label for="region">Region:</label>
+                <input type="text" id="region" placeholder="us-east-1" value="us-east-1">
+            </div>
+            <button class="btn btn-primary" onclick="saveConfig()">設定を保存</button>
         </div>
-        
-        <div class="divider">
-            <span>または</span>
+
+        <!-- ログインフォーム -->
+        <div id="login-form" class="hidden">
+            <div class="auth-header">
+                <h1>ログイン</h1>
+                <p>アカウントにサインインしてください</p>
+            </div>
+            <div class="auth-content">
+                <div id="login-alert"></div>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="loginEmail">メールアドレス</label>
+                        <input type="email" id="loginEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">パスワード</label>
+                        <input type="password" id="loginPassword" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="spinner hidden"></span>
+                        ログイン
+                    </button>
+                </form>
+                <div class="form-switch">
+                    <a href="#" onclick="showSignUp()">アカウントをお持ちでないですか？サインアップ</a><br>
+                    <a href="#" onclick="showForgotPassword()">パスワードをお忘れですか？</a>
+                </div>
+            </div>
         </div>
-        
-        <div class="social-login">
-            <button class="social-button" onclick="socialLogin('google')">
-                <svg width="18" height="18" viewBox="0 0 24 24">
-                    <path fill="#4285f4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34a853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#fbbc05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                    <path fill="#ea4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                </svg>
-                Google
-            </button>
-            <button class="social-button" onclick="socialLogin('github')">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="#333">
-                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                </svg>
-                GitHub
-            </button>
+
+        <!-- サインアップフォーム -->
+        <div id="signup-form" class="hidden">
+            <div class="auth-header">
+                <h1>サインアップ</h1>
+                <p>新しいアカウントを作成してください</p>
+            </div>
+            <div class="auth-content">
+                <div id="signup-alert"></div>
+                <form id="signupForm">
+                    <div class="form-group">
+                        <label for="signupEmail">メールアドレス</label>
+                        <input type="email" id="signupEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupPassword">パスワード</label>
+                        <input type="password" id="signupPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupPhone">電話番号（オプション）</label>
+                        <input type="tel" id="signupPhone" placeholder="+81901234567">
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="spinner hidden"></span>
+                        サインアップ
+                    </button>
+                </form>
+                <div class="form-switch">
+                    <a href="#" onclick="showLogin()">既にアカウントをお持ちですか？ログイン</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 確認コードフォーム -->
+        <div id="confirm-form" class="hidden">
+            <div class="auth-header">
+                <h1>確認コード</h1>
+                <p>メールに送信された確認コードを入力してください</p>
+            </div>
+            <div class="auth-content">
+                <div id="confirm-alert"></div>
+                <form id="confirmForm">
+                    <div class="form-group">
+                        <label for="confirmCode">確認コード</label>
+                        <input type="text" id="confirmCode" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="spinner hidden"></span>
+                        確認
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="resendConfirmation()">
+                        確認コードを再送信
+                    </button>
+                </form>
+                <div class="form-switch">
+                    <a href="#" onclick="showLogin()">ログインに戻る</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- パスワードリセットフォーム -->
+        <div id="forgot-form" class="hidden">
+            <div class="auth-header">
+                <h1>パスワードリセット</h1>
+                <p>パスワードをリセットするメールアドレスを入力してください</p>
+            </div>
+            <div class="auth-content">
+                <div id="forgot-alert"></div>
+                <form id="forgotForm">
+                    <div class="form-group">
+                        <label for="forgotEmail">メールアドレス</label>
+                        <input type="email" id="forgotEmail" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="spinner hidden"></span>
+                        リセットコードを送信
+                    </button>
+                </form>
+                <div class="form-switch">
+                    <a href="#" onclick="showLogin()">ログインに戻る</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 新しいパスワード設定フォーム -->
+        <div id="reset-form" class="hidden">
+            <div class="auth-header">
+                <h1>新しいパスワード</h1>
+                <p>確認コードと新しいパスワードを入力してください</p>
+            </div>
+            <div class="auth-content">
+                <div id="reset-alert"></div>
+                <form id="resetForm">
+                    <div class="form-group">
+                        <label for="resetCode">確認コード</label>
+                        <input type="text" id="resetCode" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="newPassword">新しいパスワード</label>
+                        <input type="password" id="newPassword" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="spinner hidden"></span>
+                        パスワードを変更
+                    </button>
+                </form>
+                <div class="form-switch">
+                    <a href="#" onclick="showLogin()">ログインに戻る</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- ダッシュボード -->
+        <div id="dashboard" class="hidden">
+            <div class="dashboard">
+                <h2>ダッシュボード</h2>
+                <div class="user-info">
+                    <p><strong>ユーザー名:</strong> <span id="username"></span></p>
+                    <p><strong>メールアドレス:</strong> <span id="email"></span></p>
+                    <p><strong>ログイン日時:</strong> <span id="loginTime"></span></p>
+                </div>
+                <button class="btn btn-secondary" onclick="logout()">ログアウト</button>
+            </div>
         </div>
     </div>
 
     <script>
-        // フォーム送信の処理
+        // グローバル変数
+        let userPool, cognitoUser, currentEmail;
+
+        // 設定を保存
+        function saveConfig() {
+            const userPoolId = document.getElementById('userPoolId').value;
+            const clientId = document.getElementById('clientId').value;
+            const region = document.getElementById('region').value;
+
+            if (!userPoolId || !clientId || !region) {
+                showAlert('config-section', 'すべての設定値を入力してください。', 'error');
+                return;
+            }
+
+            // AWS設定
+            AWS.config.region = region;
+            
+            // User Pool設定
+            const poolData = {
+                UserPoolId: userPoolId,
+                ClientId: clientId
+            };
+            
+            userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
+
+            // 設定セクションを非表示にしてログインフォームを表示
+            document.getElementById('config-section').classList.add('hidden');
+            document.getElementById('login-form').classList.remove('hidden');
+
+            // セッションチェック
+            checkSession();
+        }
+
+        // セッションチェック
+        function checkSession() {
+            if (!userPool) return;
+
+            const cognitoUser = userPool.getCurrentUser();
+            if (cognitoUser) {
+                cognitoUser.getSession((err, session) => {
+                    if (err) {
+                        console.log(err);
+                        return;
+                    }
+                    
+                    if (session.isValid()) {
+                        cognitoUser.getUserAttributes((err, attributes) => {
+                            if (err) {
+                                console.log(err);
+                                return;
+                            }
+                            
+                            showDashboard(attributes);
+                        });
+                    }
+                });
+            }
+        }
+
+        // フォーム表示切り替え
+        function showLogin() {
+            hideAllForms();
+            document.getElementById('login-form').classList.remove('hidden');
+        }
+
+        function showSignUp() {
+            hideAllForms();
+            document.getElementById('signup-form').classList.remove('hidden');
+        }
+
+        function showConfirm() {
+            hideAllForms();
+            document.getElementById('confirm-form').classList.remove('hidden');
+        }
+
+        function showForgotPassword() {
+            hideAllForms();
+            document.getElementById('forgot-form').classList.remove('hidden');
+        }
+
+        function showResetPassword() {
+            hideAllForms();
+            document.getElementById('reset-form').classList.remove('hidden');
+        }
+
+        function showDashboard(attributes) {
+            hideAllForms();
+            
+            const email = attributes.find(attr => attr.Name === 'email')?.Value || '';
+            const username = attributes.find(attr => attr.Name === 'preferred_username')?.Value || email;
+            
+            document.getElementById('username').textContent = username;
+            document.getElementById('email').textContent = email;
+            document.getElementById('loginTime').textContent = new Date().toLocaleString('ja-JP');
+            
+            document.getElementById('dashboard').classList.remove('hidden');
+        }
+
+        function hideAllForms() {
+            const forms = ['login-form', 'signup-form', 'confirm-form', 'forgot-form', 'reset-form', 'dashboard'];
+            forms.forEach(form => {
+                document.getElementById(form).classList.add('hidden');
+            });
+        }
+
+        // アラート表示
+        function showAlert(containerId, message, type = 'error') {
+            const alertContainer = document.getElementById(containerId === 'config-section' ? 'config-section' : `${containerId.replace('-form', '')}-alert`);
+            alertContainer.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => {
+                alertContainer.innerHTML = '';
+            }, 5000);
+        }
+
+        // ローディング表示
+        function showLoading(formId, show = true) {
+            const form = document.getElementById(formId);
+            const spinner = form.querySelector('.spinner');
+            const button = form.querySelector('.btn-primary');
+            
+            if (show) {
+                form.classList.add('loading');
+                spinner.classList.remove('hidden');
+                button.disabled = true;
+            } else {
+                form.classList.remove('loading');
+                spinner.classList.add('hidden');
+                button.disabled = false;
+            }
+        }
+
+        // ログイン
         document.getElementById('loginForm').addEventListener('submit', function(e) {
             e.preventDefault();
             
-            const email = document.getElementById('email').value;
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
             
-            if (!email) {
-                alert('メールアドレスを入力してください');
-                return;
-            }
+            showLoading('loginForm');
             
-            if (!isValidEmail(email)) {
-                alert('有効なメールアドレスを入力してください');
-                return;
-            }
+            const userData = {
+                Username: email,
+                Pool: userPool
+            };
             
-            // ログイン処理をシミュレート
-            const button = document.querySelector('.login-button');
-            button.textContent = 'ログイン中...';
-            button.disabled = true;
+            cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
             
-            setTimeout(() => {
-                alert(`ログインしました: ${email}`);
-                button.textContent = 'ログイン';
-                button.disabled = false;
-            }, 1500);
+            const authenticationDetails = new AmazonCognitoIdentity.AuthenticationDetails({
+                Username: email,
+                Password: password
+            });
+            
+            cognitoUser.authenticateUser(authenticationDetails, {
+                onSuccess: function(result) {
+                    showLoading('loginForm', false);
+                    
+                    cognitoUser.getUserAttributes((err, attributes) => {
+                        if (err) {
+                            showAlert('login-form', 'ユーザー情報の取得に失敗しました。');
+                            return;
+                        }
+                        
+                        showDashboard(attributes);
+                    });
+                },
+                
+                onFailure: function(err) {
+                    showLoading('loginForm', false);
+                    let message = 'ログインに失敗しました。';
+                    
+                    if (err.code === 'UserNotConfirmedException') {
+                        message = 'アカウントが確認されていません。確認コードを入力してください。';
+                        currentEmail = email;
+                        showConfirm();
+                        return;
+                    } else if (err.code === 'NotAuthorizedException') {
+                        message = 'メールアドレスまたはパスワードが間違っています。';
+                    }
+                    
+                    showAlert('login-form', message);
+                }
+            });
         });
 
-        // メールアドレスの検証
-        function isValidEmail(email) {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            return emailRegex.test(email);
-        }
-
-        // ソーシャルログイン
-        function socialLogin(provider) {
-            alert(`${provider}でログインします`);
-        }
-
-        // エンターキーでの送信
-        document.getElementById('email').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+        // サインアップ
+        document.getElementById('signupForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('signupEmail').value;
+            const password = document.getElementById('signupPassword').value;
+            const phone = document.getElementById('signupPhone').value;
+            
+            showLoading('signupForm');
+            
+            const attributeList = [
+                new AmazonCognitoIdentity.CognitoUserAttribute({
+                    Name: 'email',
+                    Value: email
+                })
+            ];
+            
+            if (phone) {
+                attributeList.push(new AmazonCognitoIdentity.CognitoUserAttribute({
+                    Name: 'phone_number',
+                    Value: phone
+                }));
             }
+            
+            userPool.signUp(email, password, attributeList, null, function(err, result) {
+                showLoading('signupForm', false);
+                
+                if (err) {
+                    let message = 'サインアップに失敗しました。';
+                    
+                    if (err.code === 'UsernameExistsException') {
+                        message = 'このメールアドレスは既に使用されています。';
+                    } else if (err.code === 'InvalidPasswordException') {
+                        message = 'パスワードが条件を満たしていません。';
+                    }
+                    
+                    showAlert('signup-form', message);
+                    return;
+                }
+                
+                cognitoUser = result.user;
+                currentEmail = email;
+                showAlert('signup-form', 'サインアップが完了しました。確認コードを入力してください。', 'success');
+                
+                setTimeout(() => {
+                    showConfirm();
+                }, 2000);
+            });
+        });
+
+        // 確認コード
+        document.getElementById('confirmForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const confirmCode = document.getElementById('confirmCode').value;
+            
+            showLoading('confirmForm');
+            
+            if (!cognitoUser && currentEmail) {
+                const userData = {
+                    Username: currentEmail,
+                    Pool: userPool
+                };
+                cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+            }
+            
+            cognitoUser.confirmRegistration(confirmCode, true, function(err, result) {
+                showLoading('confirmForm', false);
+                
+                if (err) {
+                    let message = '確認に失敗しました。';
+                    
+                    if (err.code === 'CodeMismatchException') {
+                        message = '確認コードが間違っています。';
+                    } else if (err.code === 'ExpiredCodeException') {
+                        message = '確認コードの有効期限が切れています。';
+                    }
+                    
+                    showAlert('confirm-form', message);
+                    return;
+                }
+                
+                showAlert('confirm-form', 'アカウントの確認が完了しました。ログインしてください。', 'success');
+                
+                setTimeout(() => {
+                    showLogin();
+                }, 2000);
+            });
+        });
+
+        // 確認コード再送信
+        function resendConfirmation() {
+            if (!cognitoUser) return;
+            
+            cognitoUser.resendConfirmationCode(function(err, result) {
+                if (err) {
+                    showAlert('confirm-form', '確認コードの再送信に失敗しました。');
+                    return;
+                }
+                
+                showAlert('confirm-form', '確認コードを再送信しました。', 'success');
+            });
+        }
+
+        // パスワードリセット
+        document.getElementById('forgotForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('forgotEmail').value;
+            
+            showLoading('forgotForm');
+            
+            const userData = {
+                Username: email,
+                Pool: userPool
+            };
+            
+            cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+            currentEmail = email;
+            
+            cognitoUser.forgotPassword({
+                onSuccess: function(data) {
+                    showLoading('forgotForm', false);
+                    showAlert('forgot-form', 'パスワードリセットコードを送信しました。', 'success');
+                    
+                    setTimeout(() => {
+                        showResetPassword();
+                    }, 2000);
+                },
+                
+                onFailure: function(err) {
+                    showLoading('forgotForm', false);
+                    showAlert('forgot-form', 'パスワードリセットに失敗しました。');
+                }
+            });
+        });
+
+        // パスワードリセット確認
+        document.getElementById('resetForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const resetCode = document.getElementById('resetCode').value;
+            const newPassword = document.getElementById('newPassword').value;
+            
+            showLoading('resetForm');
+            
+            cognitoUser.confirmPassword(resetCode, newPassword, {
+                onSuccess: function() {
+                    showLoading('resetForm', false);
+                    showAlert('reset-form', 'パスワードが変更されました。ログインしてください。', 'success');
+                    
+                    setTimeout(() => {
+                        showLogin();
+                    }, 2000);
+                },
+                
+                onFailure: function(err) {
+                    showLoading('resetForm', false);
+                    let message = 'パスワードの変更に失敗しました。';
+                    
+                    if (err.code === 'CodeMismatchException') {
+                        message = '確認コードが間違っています。';
+                    } else if (err.code === 'InvalidPasswordException') {
+                        message = 'パスワードが条件を満たしていません。';
+                    }
+                    
+                    showAlert('reset-form', message);
+                }
+            });
+        });
+
+        // ログアウト
+        function logout() {
+            if (userPool) {
+                const cognitoUser = userPool.getCurrentUser();
+                if (cognitoUser) {
+                    cognitoUser.signOut();
+                }
+            }
+            
+            showLogin();
+        }
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 設定セクションを表示
+            document.getElementById('config-section').classList.remove('hidden');
         });
     </script>
 </body>
