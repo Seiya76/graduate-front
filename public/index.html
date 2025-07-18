@@ -29,15 +29,533 @@
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
-    <!--
-      This HTML file is a template.
-      If you open it directly in the browser, you will see an empty page.
+    <!-- ログインフォーム -->
+        <div id="login-form" class="hidden">
+            <div class="auth-header">
+                <h1>ログイン</h1>
+                <p>アカウントにサインインしてください</p>
+            </div>
+            <div class="auth-content">
+                <div id="login-alert"></div>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="loginEmail">メールアドレス</label>
+                        <input type="email" id="loginEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">パスワード</label>
+                        <input type="password" id="loginPassword" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="spinner hidden"></span>
+                        ログイン
+                    </button>
+                </form>
+                <div class="form-switch">
+                    <a href="#" onclick="showSignUp()">アカウントをお持ちでないですか？サインアップ</a><br>
+                    <a href="#" onclick="showForgotPassword()">パスワードをお忘れですか？</a>
+                </div>
+            </div>
+        </div>
 
-      You can add webfonts, meta tags, or analytics to this file.
-      The build step will place the bundled scripts into the <body> tag.
+        <!-- サインアップフォーム -->
+        <div id="signup-form" class="hidden">
+            <div class="auth-header">
+                <h1>サインアップ</h1>
+                <p>新しいアカウントを作成してください</p>
+            </div>
+            <div class="auth-content">
+                <div id="signup-alert"></div>
+                <form id="signupForm">
+                    <div class="form-group">
+                        <label for="signupEmail">メールアドレス</label>
+                        <input type="email" id="signupEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupPassword">パスワード</label>
+                        <input type="password" id="signupPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupPhone">電話番号（オプション）</label>
+                        <input type="tel" id="signupPhone" placeholder="+81901234567">
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="spinner hidden"></span>
+                        サインアップ
+                    </button>
+                </form>
+                <div class="form-switch">
+                    <a href="#" onclick="showLogin()">既にアカウントをお持ちですか？ログイン</a>
+                </div>
+            </div>
+        </div>
 
-      To begin the development, run `npm start` or `yarn start`.
-      To create a production bundle, use `npm run build` or `yarn build`.
-    -->
+        <!-- 確認コードフォーム -->
+        <div id="confirm-form" class="hidden">
+            <div class="auth-header">
+                <h1>確認コード</h1>
+                <p>メールに送信された確認コードを入力してください</p>
+            </div>
+            <div class="auth-content">
+                <div id="confirm-alert"></div>
+                <form id="confirmForm">
+                    <div class="form-group">
+                        <label for="confirmCode">確認コード</label>
+                        <input type="text" id="confirmCode" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="spinner hidden"></span>
+                        確認
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="resendConfirmation()">
+                        確認コードを再送信
+                    </button>
+                </form>
+                <div class="form-switch">
+                    <a href="#" onclick="showLogin()">ログインに戻る</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- パスワードリセットフォーム -->
+        <div id="forgot-form" class="hidden">
+            <div class="auth-header">
+                <h1>パスワードリセット</h1>
+                <p>パスワードをリセットするメールアドレスを入力してください</p>
+            </div>
+            <div class="auth-content">
+                <div id="forgot-alert"></div>
+                <form id="forgotForm">
+                    <div class="form-group">
+                        <label for="forgotEmail">メールアドレス</label>
+                        <input type="email" id="forgotEmail" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="spinner hidden"></span>
+                        リセットコードを送信
+                    </button>
+                </form>
+                <div class="form-switch">
+                    <a href="#" onclick="showLogin()">ログインに戻る</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 新しいパスワード設定フォーム -->
+        <div id="reset-form" class="hidden">
+            <div class="auth-header">
+                <h1>新しいパスワード</h1>
+                <p>確認コードと新しいパスワードを入力してください</p>
+            </div>
+            <div class="auth-content">
+                <div id="reset-alert"></div>
+                <form id="resetForm">
+                    <div class="form-group">
+                        <label for="resetCode">確認コード</label>
+                        <input type="text" id="resetCode" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="newPassword">新しいパスワード</label>
+                        <input type="password" id="newPassword" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="spinner hidden"></span>
+                        パスワードを変更
+                    </button>
+                </form>
+                <div class="form-switch">
+                    <a href="#" onclick="showLogin()">ログインに戻る</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- ダッシュボード -->
+        <div id="dashboard" class="hidden">
+            <div class="dashboard">
+                <h2>ダッシュボード</h2>
+                <div class="user-info">
+                    <p><strong>ユーザー名:</strong> <span id="username"></span></p>
+                    <p><strong>メールアドレス:</strong> <span id="email"></span></p>
+                    <p><strong>ログイン日時:</strong> <span id="loginTime"></span></p>
+                </div>
+                <button class="btn btn-secondary" onclick="logout()">ログアウト</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // グローバル変数
+        let userPool, cognitoUser, currentEmail;
+
+        // 設定を保存
+        function saveConfig() {
+            const userPoolId = document.getElementById('userPoolId').value;
+            const clientId = document.getElementById('clientId').value;
+            const region = document.getElementById('region').value;
+
+            if (!userPoolId || !clientId || !region) {
+                showAlert('config-section', 'すべての設定値を入力してください。', 'error');
+                return;
+            }
+
+            // AWS設定
+            AWS.config.region = region;
+            
+            // User Pool設定
+            const poolData = {
+                UserPoolId: userPoolId,
+                ClientId: clientId
+            };
+            
+            userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
+
+            // 設定セクションを非表示にしてログインフォームを表示
+            document.getElementById('config-section').classList.add('hidden');
+            document.getElementById('login-form').classList.remove('hidden');
+
+            // セッションチェック
+            checkSession();
+        }
+
+        // セッションチェック
+        function checkSession() {
+            if (!userPool) return;
+
+            const cognitoUser = userPool.getCurrentUser();
+            if (cognitoUser) {
+                cognitoUser.getSession((err, session) => {
+                    if (err) {
+                        console.log(err);
+                        return;
+                    }
+                    
+                    if (session.isValid()) {
+                        cognitoUser.getUserAttributes((err, attributes) => {
+                            if (err) {
+                                console.log(err);
+                                return;
+                            }
+                            
+                            showDashboard(attributes);
+                        });
+                    }
+                });
+            }
+        }
+
+        // フォーム表示切り替え
+        function showLogin() {
+            hideAllForms();
+            document.getElementById('login-form').classList.remove('hidden');
+        }
+
+        function showSignUp() {
+            hideAllForms();
+            document.getElementById('signup-form').classList.remove('hidden');
+        }
+
+        function showConfirm() {
+            hideAllForms();
+            document.getElementById('confirm-form').classList.remove('hidden');
+        }
+
+        function showForgotPassword() {
+            hideAllForms();
+            document.getElementById('forgot-form').classList.remove('hidden');
+        }
+
+        function showResetPassword() {
+            hideAllForms();
+            document.getElementById('reset-form').classList.remove('hidden');
+        }
+
+        function showDashboard(attributes) {
+            hideAllForms();
+            
+            const email = attributes.find(attr => attr.Name === 'email')?.Value || '';
+            const username = attributes.find(attr => attr.Name === 'preferred_username')?.Value || email;
+            
+            document.getElementById('username').textContent = username;
+            document.getElementById('email').textContent = email;
+            document.getElementById('loginTime').textContent = new Date().toLocaleString('ja-JP');
+            
+            document.getElementById('dashboard').classList.remove('hidden');
+        }
+
+        function hideAllForms() {
+            const forms = ['login-form', 'signup-form', 'confirm-form', 'forgot-form', 'reset-form', 'dashboard'];
+            forms.forEach(form => {
+                document.getElementById(form).classList.add('hidden');
+            });
+        }
+
+        // アラート表示
+        function showAlert(containerId, message, type = 'error') {
+            const alertContainer = document.getElementById(containerId === 'config-section' ? 'config-section' : `${containerId.replace('-form', '')}-alert`);
+            alertContainer.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => {
+                alertContainer.innerHTML = '';
+            }, 5000);
+        }
+
+        // ローディング表示
+        function showLoading(formId, show = true) {
+            const form = document.getElementById(formId);
+            const spinner = form.querySelector('.spinner');
+            const button = form.querySelector('.btn-primary');
+            
+            if (show) {
+                form.classList.add('loading');
+                spinner.classList.remove('hidden');
+                button.disabled = true;
+            } else {
+                form.classList.remove('loading');
+                spinner.classList.add('hidden');
+                button.disabled = false;
+            }
+        }
+
+        // ログイン
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            showLoading('loginForm');
+            
+            const userData = {
+                Username: email,
+                Pool: userPool
+            };
+            
+            cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+            
+            const authenticationDetails = new AmazonCognitoIdentity.AuthenticationDetails({
+                Username: email,
+                Password: password
+            });
+            
+            cognitoUser.authenticateUser(authenticationDetails, {
+                onSuccess: function(result) {
+                    showLoading('loginForm', false);
+                    
+                    cognitoUser.getUserAttributes((err, attributes) => {
+                        if (err) {
+                            showAlert('login-form', 'ユーザー情報の取得に失敗しました。');
+                            return;
+                        }
+                        
+                        showDashboard(attributes);
+                    });
+                },
+                
+                onFailure: function(err) {
+                    showLoading('loginForm', false);
+                    let message = 'ログインに失敗しました。';
+                    
+                    if (err.code === 'UserNotConfirmedException') {
+                        message = 'アカウントが確認されていません。確認コードを入力してください。';
+                        currentEmail = email;
+                        showConfirm();
+                        return;
+                    } else if (err.code === 'NotAuthorizedException') {
+                        message = 'メールアドレスまたはパスワードが間違っています。';
+                    }
+                    
+                    showAlert('login-form', message);
+                }
+            });
+        });
+
+        // サインアップ
+        document.getElementById('signupForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('signupEmail').value;
+            const password = document.getElementById('signupPassword').value;
+            const phone = document.getElementById('signupPhone').value;
+            
+            showLoading('signupForm');
+            
+            const attributeList = [
+                new AmazonCognitoIdentity.CognitoUserAttribute({
+                    Name: 'email',
+                    Value: email
+                })
+            ];
+            
+            if (phone) {
+                attributeList.push(new AmazonCognitoIdentity.CognitoUserAttribute({
+                    Name: 'phone_number',
+                    Value: phone
+                }));
+            }
+            
+            userPool.signUp(email, password, attributeList, null, function(err, result) {
+                showLoading('signupForm', false);
+                
+                if (err) {
+                    let message = 'サインアップに失敗しました。';
+                    
+                    if (err.code === 'UsernameExistsException') {
+                        message = 'このメールアドレスは既に使用されています。';
+                    } else if (err.code === 'InvalidPasswordException') {
+                        message = 'パスワードが条件を満たしていません。';
+                    }
+                    
+                    showAlert('signup-form', message);
+                    return;
+                }
+                
+                cognitoUser = result.user;
+                currentEmail = email;
+                showAlert('signup-form', 'サインアップが完了しました。確認コードを入力してください。', 'success');
+                
+                setTimeout(() => {
+                    showConfirm();
+                }, 2000);
+            });
+        });
+
+        // 確認コード
+        document.getElementById('confirmForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const confirmCode = document.getElementById('confirmCode').value;
+            
+            showLoading('confirmForm');
+            
+            if (!cognitoUser && currentEmail) {
+                const userData = {
+                    Username: currentEmail,
+                    Pool: userPool
+                };
+                cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+            }
+            
+            cognitoUser.confirmRegistration(confirmCode, true, function(err, result) {
+                showLoading('confirmForm', false);
+                
+                if (err) {
+                    let message = '確認に失敗しました。';
+                    
+                    if (err.code === 'CodeMismatchException') {
+                        message = '確認コードが間違っています。';
+                    } else if (err.code === 'ExpiredCodeException') {
+                        message = '確認コードの有効期限が切れています。';
+                    }
+                    
+                    showAlert('confirm-form', message);
+                    return;
+                }
+                
+                showAlert('confirm-form', 'アカウントの確認が完了しました。ログインしてください。', 'success');
+                
+                setTimeout(() => {
+                    showLogin();
+                }, 2000);
+            });
+        });
+
+        // 確認コード再送信
+        function resendConfirmation() {
+            if (!cognitoUser) return;
+            
+            cognitoUser.resendConfirmationCode(function(err, result) {
+                if (err) {
+                    showAlert('confirm-form', '確認コードの再送信に失敗しました。');
+                    return;
+                }
+                
+                showAlert('confirm-form', '確認コードを再送信しました。', 'success');
+            });
+        }
+
+        // パスワードリセット
+        document.getElementById('forgotForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('forgotEmail').value;
+            
+            showLoading('forgotForm');
+            
+            const userData = {
+                Username: email,
+                Pool: userPool
+            };
+            
+            cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+            currentEmail = email;
+            
+            cognitoUser.forgotPassword({
+                onSuccess: function(data) {
+                    showLoading('forgotForm', false);
+                    showAlert('forgot-form', 'パスワードリセットコードを送信しました。', 'success');
+                    
+                    setTimeout(() => {
+                        showResetPassword();
+                    }, 2000);
+                },
+                
+                onFailure: function(err) {
+                    showLoading('forgotForm', false);
+                    showAlert('forgot-form', 'パスワードリセットに失敗しました。');
+                }
+            });
+        });
+
+        // パスワードリセット確認
+        document.getElementById('resetForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const resetCode = document.getElementById('resetCode').value;
+            const newPassword = document.getElementById('newPassword').value;
+            
+            showLoading('resetForm');
+            
+            cognitoUser.confirmPassword(resetCode, newPassword, {
+                onSuccess: function() {
+                    showLoading('resetForm', false);
+                    showAlert('reset-form', 'パスワードが変更されました。ログインしてください。', 'success');
+                    
+                    setTimeout(() => {
+                        showLogin();
+                    }, 2000);
+                },
+                
+                onFailure: function(err) {
+                    showLoading('resetForm', false);
+                    let message = 'パスワードの変更に失敗しました。';
+                    
+                    if (err.code === 'CodeMismatchException') {
+                        message = '確認コードが間違っています。';
+                    } else if (err.code === 'InvalidPasswordException') {
+                        message = 'パスワードが条件を満たしていません。';
+                    }
+                    
+                    showAlert('reset-form', message);
+                }
+            });
+        });
+
+        // ログアウト
+        function logout() {
+            if (userPool) {
+                const cognitoUser = userPool.getCurrentUser();
+                if (cognitoUser) {
+                    cognitoUser.signOut();
+                }
+            }
+            
+            showLogin();
+        }
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 設定セクションを表示
+            document.getElementById('config-section').classList.remove('hidden');
+        });
+    </script>
   </body>
 </html>
