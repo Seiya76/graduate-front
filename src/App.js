@@ -171,7 +171,7 @@ const Dashboard = () => {
         </div>
         <div>
           <button 
-            onClick={() => auth.removeUser()}
+            onClick={() => signOutRedirect()}
             style={{
               padding: '10px 20px',
               backgroundColor: '#dc3545',
