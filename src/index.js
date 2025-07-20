@@ -3,19 +3,24 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
-import { Amplify } from 'aws-amplify';
+import { AuthProvider } from 'react-oidc-context';
 
-Amplify.configure({
-  Auth: {
-    resion: "ap-northeast-1",
-    userPoolId: "ap-northeast-1_u9YhtfyWO",
-    userPoolWebClientId: "8pua3oe15pci4ci7m0misd8eu"
-  }
-});
+const cognitoAuthConfig = {
+  authority: "https://cognito-idp.ap-northeast-1.amazonaws.com/ap-northeast-1_u9YhtfyWO",
+  client_id: "8pua3oe15pci4ci7m0misd8eu",
+  redirect_uri: "https://main.d3rgq9lalaa9gb.amplifyapp.com/",
+  response_type: "code",
+  scope: "aws.cognito.signin.user.admin email openid phone",
+
+};
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
+//AuthProviderで囲んで、cognito連携
 root.render(
   <React.StrictMode>
-    <App />
+    <AuthProvider {...cognitoAuthConfig}>
+      <App />
+    </AuthProvider>
   </React.StrictMode>
 );
 
