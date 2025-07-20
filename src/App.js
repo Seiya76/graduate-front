@@ -10,7 +10,7 @@ function App() {
 
   const signOutRedirect = () => {
     const clientId = "8pua3oe15pci4ci7m0misd8eu";
-    const logoutUri = "https://main.d2ggyu4753li5n.amplifyapp.com/";
+    const logoutUri = "https://main.d3rgq9lalaa9gb.amplifyapp.com/";
     const cognitoDomain =
       "https://ap-northeast-1u9yhtfywo.auth.ap-northeast-1.amazoncognito.com";
     window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(
@@ -31,7 +31,7 @@ function App() {
         <pre> Hello: {auth.user?.profile.email} </pre>
         <pre> ID Token: {auth.user?.id_token} </pre>
         <pre> Access Token: {auth.user?.access_token} </pre>
-        <pre> Refresh Token: {auth.user?.refresh_token} </pre>
+        {/* <pre> Refresh Token: {auth.user?.refresh_token} </pre> */}
 
         <button onClick={() => auth.removeUser()}>Sign out</button>
       </div>
@@ -39,7 +39,6 @@ function App() {
   }
 
   return (
-    //ログイン画面にするとよいかも？？？
     <div className="App">
       <header className="App-header">
         <img src={logo} className="App-logo" alt="logo" />
