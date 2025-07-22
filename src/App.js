@@ -117,10 +117,7 @@ function App() {
     <div className="App">
       <header className="App-header">
         <img src={logo} className="App-logo" alt="logo" />
-        <h1>チャットアプリ</h1>
-        <p>
-          サインインしてチャットを始めましょう
-        </p>
+        <h1>G00gleChat</h1>
         <div className="auth-buttons">
           <button 
             onClick={() => auth.signinRedirect()} 
