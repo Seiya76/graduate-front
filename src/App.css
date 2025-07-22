@@ -160,6 +160,8 @@ body {
 .chat-icon {
   margin-right: 8px;
   font-size: 24px;
+  font-weight: 600;
+  color: #1a73e8;
 }
 
 .header-actions {
@@ -176,10 +178,89 @@ body {
   font-size: 16px;
   color: #5f6368;
   transition: background-color 0.2s;
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .icon-btn:hover {
   background-color: #f1f3f4;
+}
+
+/* CSS Icons */
+.search-btn::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  position: relative;
+}
+
+.search-btn::after {
+  content: '';
+  width: 6px;
+  height: 2px;
+  background: currentColor;
+  position: absolute;
+  transform: rotate(45deg);
+  top: 20px;
+  left: 20px;
+}
+
+.signout-btn {
+  color: #ea4335 !important;
+}
+
+.signout-btn:hover {
+  background-color: #fce8e6 !important;
+  color: #d33b2c !important;
+}
+
+.signout-btn::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  position: relative;
+}
+
+.signout-btn::after {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 4px solid currentColor;
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+}
+
+.pin-btn::before {
+  content: '';
+  width: 3px;
+  height: 12px;
+  background: currentColor;
+  position: absolute;
+  transform: rotate(45deg);
+}
+
+.pin-btn::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  position: absolute;
+  top: 6px;
+  left: 10px;
 }
 
 /* 新しいチャット */
@@ -264,6 +345,138 @@ body {
 .nav-icon {
   margin-right: 12px;
   font-size: 16px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+/* Space Icons */
+.icon-home::before {
+  content: '';
+  width: 16px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-top: none;
+  position: relative;
+}
+
+.icon-home::after {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 6px solid currentColor;
+  position: absolute;
+  top: -2px;
+  left: 2px;
+}
+
+.icon-team::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+}
+
+.icon-team::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  right: 2px;
+}
+
+.icon-chart::before {
+  content: '';
+  width: 3px;
+  height: 8px;
+  background: currentColor;
+  position: absolute;
+  bottom: 2px;
+  left: 3px;
+}
+
+.icon-chart::after {
+  content: '';
+  width: 3px;
+  height: 12px;
+  background: currentColor;
+  position: absolute;
+  bottom: 2px;
+  right: 3px;
+}
+
+.icon-design::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+  position: relative;
+}
+
+.icon-design::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: currentColor;
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.icon-folder::before {
+  content: '';
+  width: 14px;
+  height: 10px;
+  border: 2px solid currentColor;
+  border-top-right-radius: 2px;
+  border-bottom-radius: 2px;
+  position: relative;
+}
+
+.icon-folder::after {
+  content: '';
+  width: 6px;
+  height: 2px;
+  background: currentColor;
+  position: absolute;
+  top: -1px;
+  left: 1px;
+}
+
+/* User Avatar */
+.user-avatar {
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  text-transform: uppercase;
+}
+
+.message-avatar.user-avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 12px;
 }
 
 .nav-text {
@@ -567,10 +780,62 @@ body {
   font-size: 16px;
   color: #5f6368;
   margin-right: 8px;
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .attach-btn:hover {
   background-color: #f1f3f4;
+}
+
+.attach-btn::before {
+  content: '';
+  width: 3px;
+  height: 12px;
+  background: currentColor;
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+
+.attach-btn::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  position: absolute;
+  top: 8px;
+  left: 8px;
+}
+
+.emoji-btn {
+  position: relative;
+}
+
+.emoji-btn::before {
+  content: '';
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  position: relative;
+}
+
+.emoji-btn::after {
+  content: '';
+  width: 8px;
+  height: 4px;
+  border: 2px solid currentColor;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -25%);
 }
 
 .input-container .message-input {
@@ -605,7 +870,6 @@ body {
   padding: 8px;
   border-radius: 50%;
   cursor: pointer;
-  font-size: 18px;
   color: #9aa0a6;
   transition: all 0.2s;
   display: flex;
@@ -613,6 +877,16 @@ body {
   justify-content: center;
   width: 36px;
   height: 36px;
+  position: relative;
+}
+
+.input-container .send-btn::before {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 8px solid currentColor;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
 }
 
 .input-container .send-btn.active {

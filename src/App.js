@@ -13,7 +13,7 @@ function ChatScreen({ user, onSignOut }) {
       content: "チャットへようこそ！",
       time: "10:00",
       isOwn: false,
-      avatar: "🤖"
+      avatar: "SY"
     },
     {
       id: 2,
@@ -21,7 +21,7 @@ function ChatScreen({ user, onSignOut }) {
       content: "おはようございます！今日もよろしくお願いします。",
       time: "10:15",
       isOwn: false,
-      avatar: "👨"
+      avatar: "TT"
     },
     {
       id: 3,
@@ -29,24 +29,24 @@ function ChatScreen({ user, onSignOut }) {
       content: "プロジェクトの進捗はいかがでしょうか？",
       time: "10:30",
       isOwn: false,
-      avatar: "👩"
+      avatar: "SH"
     }
   ]);
   const [newMessage, setNewMessage] = useState("");
 
   const spaces = [
-    { name: "ホーム", icon: "🏠", type: "home" },
-    { name: "開発チーム", icon: "👥", type: "space" },
-    { name: "マーケティング", icon: "📈", type: "space" },
-    { name: "デザイン", icon: "🎨", type: "space" },
-    { name: "プロジェクトA", icon: "📁", type: "space" }
+    { name: "ホーム", icon: "home", type: "home" },
+    { name: "開発チーム", icon: "team", type: "space" },
+    { name: "マーケティング", icon: "chart", type: "space" },
+    { name: "デザイン", icon: "design", type: "space" },
+    { name: "プロジェクトA", icon: "folder", type: "space" }
   ];
 
   const recentChats = [
-    { name: "田中太郎", lastMessage: "資料の件、確認しました", time: "11:54", avatar: "👨" },
-    { name: "佐藤花子", lastMessage: "会議の時間を変更できますか？", time: "11:30", avatar: "👩" },
-    { name: "鈴木一郎", lastMessage: "今日はお疲れ様でした", time: "昨日", avatar: "👨‍💼" },
-    { name: "山田美咲", lastMessage: "新しいデザインはいかがですか？", time: "昨日", avatar: "👩‍🎨" }
+    { name: "田中太郎", lastMessage: "資料の件、確認しました", time: "11:54", avatar: "TT" },
+    { name: "佐藤花子", lastMessage: "会議の時間を変更できますか？", time: "11:30", avatar: "SH" },
+    { name: "鈴木一郎", lastMessage: "今日はお疲れ様でした", time: "昨日", avatar: "SI" },
+    { name: "山田美咲", lastMessage: "新しいデザインはいかがですか？", time: "昨日", avatar: "YM" }
   ];
 
   const sendMessage = () => {
@@ -60,7 +60,7 @@ function ChatScreen({ user, onSignOut }) {
           minute: '2-digit' 
         }),
         isOwn: true,
-        avatar: "👤"
+        avatar: user.profile.name ? user.profile.name.substring(0, 2).toUpperCase() : user.profile.email.substring(0, 2).toUpperCase()
       };
       setMessages([...messages, message]);
       setNewMessage("");
@@ -81,12 +81,11 @@ function ChatScreen({ user, onSignOut }) {
         {/* ヘッダー */}
         <div className="sidebar-header">
           <div className="app-title">
-            <span className="chat-icon">💬</span>
-            <span>Chat</span>
+            <span className="chat-icon">Chat</span>
           </div>
           <div className="header-actions">
-            <button className="icon-btn">🔍</button>
-            <button className="icon-btn" onClick={onSignOut}>⚙️</button>
+            <button className="icon-btn search-btn" title="検索"></button>
+            <button className="icon-btn signout-btn" onClick={onSignOut} title="サインアウト"></button>
           </div>
         </div>
 
@@ -108,7 +107,7 @@ function ChatScreen({ user, onSignOut }) {
                 className={`nav-item ${selectedSpace === space.name ? 'active' : ''}`}
                 onClick={() => setSelectedSpace(space.name)}
               >
-                <span className="nav-icon">{space.icon}</span>
+                <span className={`nav-icon icon-${space.icon}`}></span>
                 <span className="nav-text">{space.name}</span>
               </div>
             ))}
@@ -118,7 +117,7 @@ function ChatScreen({ user, onSignOut }) {
             <div className="nav-group-header">ダイレクト メッセージ</div>
             {recentChats.map((chat) => (
               <div key={chat.name} className="nav-item dm-item">
-                <span className="nav-icon">{chat.avatar}</span>
+                <span className="nav-icon user-avatar">{chat.avatar}</span>
                 <span className="nav-text">{chat.name}</span>
                 <div className="status-indicator online"></div>
               </div>
@@ -138,7 +137,7 @@ function ChatScreen({ user, onSignOut }) {
           <div className="chat-actions">
             <button className="action-btn">未読</button>
             <button className="action-btn">スレッド</button>
-            <button className="icon-btn">📌</button>
+            <button className="icon-btn pin-btn" title="ピン留め"></button>
           </div>
         </div>
 
@@ -151,7 +150,7 @@ function ChatScreen({ user, onSignOut }) {
                 className={`message-item ${message.isOwn ? 'own-message' : ''}`}
               >
                 {!message.isOwn && (
-                  <div className="message-avatar">{message.avatar}</div>
+                  <div className="message-avatar user-avatar">{message.avatar}</div>
                 )}
                 <div className="message-content">
                   <div className="message-header">
@@ -168,7 +167,7 @@ function ChatScreen({ user, onSignOut }) {
         {/* メッセージ入力 */}
         <div className="message-input-area">
           <div className="input-container">
-            <button className="attach-btn">📎</button>
+            <button className="attach-btn" title="ファイル添付"></button>
             <textarea
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
@@ -178,13 +177,13 @@ function ChatScreen({ user, onSignOut }) {
               rows="1"
             />
             <div className="input-actions">
-              <button className="icon-btn">😊</button>
+              <button className="icon-btn emoji-btn" title="絵文字"></button>
               <button 
                 onClick={sendMessage} 
                 className={`send-btn ${newMessage.trim() ? 'active' : ''}`}
                 disabled={!newMessage.trim()}
+                title="送信"
               >
-                ➤
               </button>
             </div>
           </div>
