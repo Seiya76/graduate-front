@@ -3,7 +3,11 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
-import { AuthProvider } from 'react-oidc-context';
+import { AuthProvider } from 'react-oidc-context';//cognito認証(OIDC)をインポート
+import { Amplify }from 'aws-amplify';
+import config from './aws-exports'; //Appsync用のConfigをインポート
+
+Amplify.configure(config);
 
 const cognitoAuthConfig = {
   authority: "https://cognito-idp.ap-northeast-1.amazonaws.com/ap-northeast-1_u9YhtfyWO",
