@@ -2,6 +2,10 @@
 
 
 const config =  {
+  aws_project_region: 'ap-northeast-1',
+  aws_appsync_graphqlEndpoint: 'https://qnem7fbxyqxacvnz4yvxkqem.appsync-api.ap-northeast-1.amazonaws.com/graphql',
+  aws_appsync_region: 'ap-northeast-1',
+  aws_appsync_authenticationType: 'AMAZON_COGNITO_USER_POOLS',
     API: {
         GraphQL: {
           endpoint: 'https://gneum7fbxvggxacvnz4yvxkqem.appsync-api.ap-northeast-1.amazonaws.com/graphql',
