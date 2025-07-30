@@ -14,8 +14,7 @@ const cognitoAuthConfig = {
   client_id: "8pua3oe15pci4ci7m0misd8eu",
   redirect_uri: "https://main.d3rgq9lalaa9gb.amplifyapp.com/",
   response_type: "code",
-  scope: "aws.cognito.signin.user.admin email openid phone",
-
+  scope: "email openid",
 };
 
 const root = ReactDOM.createRoot(document.getElementById('root'));

@@ -199,11 +199,8 @@ function App() {
   const signOutRedirect = () => {
     const clientId = "8pua3oe15pci4ci7m0misd8eu";
     const logoutUri = "https://main.d3rgq9lalaa9gb.amplifyapp.com/";
-    const cognitoDomain =
-      "https://ap-northeast-1u9yhtfywo.auth.ap-northeast-1.amazoncognito.com";
-    window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(
-      logoutUri
-    )}`;
+    const cognitoDomain = "https://ap-northeast-1u9yhtfywo.auth.ap-northeast-1.amazoncognito.com";
+    window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`;
   };
 
   if (auth.isLoading) {
