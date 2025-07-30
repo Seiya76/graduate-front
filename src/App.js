@@ -1,98 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import logo from "./logo.svg";
 import "./App.css";
 import { useAuth } from "react-oidc-context";
-
-// ===== ここに追加 =====
-import { generateClient } from 'aws-amplify/api';
-import { Amplify } from 'aws-amplify';
-import config from './aws-exports';
-
-// Amplify設定
-Amplify.configure(config);
-
-// AppSync接続テスト（一時的なテスト用）
-const testAppSyncConnection = async () => {
-  try {
-    console.log('🔧 設定情報:', {
-      endpoint: config.API.GraphQL.endpoint,
-      region: config.API.GraphQL.region,
-      authMode: config.API.GraphQL.defaultAuthMode,
-      userPoolId: config.Auth?.userPoolId,
-      clientId: config.Auth?.userPoolWebClientId
-    });
-
-    // 基本的な接続テスト
-    const basicTest = await fetch(config.API.GraphQL.endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query: '{ __typename }'
-      })
-    });
-    
-    console.log('🌐 基本接続テスト:', {
-      status: basicTest.status,
-      statusText: basicTest.statusText,
-      ok: basicTest.ok
-    });
-    
-    if (basicTest.status === 401) {
-      console.log('✅ 認証が必要（正常）- AppSync エンドポイント接続OK');
-    } else if (basicTest.ok) {
-      console.log('✅ AppSync エンドポイント接続OK');
-    } else {
-      console.log('❌ AppSync エンドポイント接続NG');
-    }
-
-    return true;
-  } catch (error) {
-    console.error('❌ AppSync設定エラー:', error);
-    return false;
-  }
-};
-
-// OIDC認証テスト
-const testWithOIDCAuth = async (oidcUser) => {
-  try {
-    console.log('🔐 OIDC認証情報テスト:', {
-      hasUser: !!oidcUser,
-      hasIdToken: !!oidcUser?.id_token,
-      hasAccessToken: !!oidcUser?.access_token,
-      userId: oidcUser?.profile?.sub,
-      email: oidcUser?.profile?.email
-    });
-
-    if (!oidcUser || !oidcUser.id_token) {
-      console.warn('⚠️ OIDC認証情報が不完全');
-      return false;
-    }
-
-    // 認証付きクライアント作成
-    const client = generateClient({
-      authMode: 'userPool',
-      authToken: oidcUser.id_token
-    });
-
-    console.log('✅ 認証付きクライアント作成完了');
-
-    // 簡単なGraphQLテスト
-    const testQuery = `query TestAuth { __typename }`;
-    const result = await client.graphql({
-      query: testQuery
-    });
-    
-    console.log('✅ 認証付きGraphQLテスト成功:', result);
-    return true;
-    
-  } catch (error) {
-    console.error('❌ OIDC認証テストエラー:', error);
-    return false;
-  }
-};
-// ===== 追加終了 =====
 
 // Google Chat風のチャット画面コンポーネント
 function ChatScreen({ user, onSignOut }) {
@@ -124,25 +33,6 @@ function ChatScreen({ user, onSignOut }) {
     }
   ]);
   const [newMessage, setNewMessage] = useState("");
-
-  // ===== ここに追加 =====
-  // AppSync接続テスト（ユーザーログイン後）
-  useEffect(() => {
-    if (user) {
-      console.log('👤 ユーザーログイン完了、AppSyncテスト開始');
-      
-      // 基本接続テスト
-      testAppSyncConnection().then(basicResult => {
-        console.log('📊 基本接続テスト結果:', basicResult);
-        
-        // OIDC認証テスト
-        testWithOIDCAuth(user).then(authResult => {
-          console.log('🔐 認証テスト結果:', authResult);
-        });
-      });
-    }
-  }, [user]);
-  // ===== 追加終了 =====
 
   const spaces = [
     { name: "ホーム", icon: "home", type: "home" },
@@ -186,29 +76,6 @@ function ChatScreen({ user, onSignOut }) {
 
   return (
     <div className="chat-app">
-      {/* ===== デバッグ情報表示（一時的） ===== */}
-      <div style={{
-        position: 'fixed',
-        top: '10px',
-        right: '10px',
-        background: '#e8f5e8',
-        color: '#2e7d32',
-        padding: '10px',
-        borderRadius: '4px',
-        fontSize: '12px',
-        zIndex: 1000,
-        maxWidth: '300px'
-      }}>
-        <div><strong>🔧 AppSync接続テスト</strong></div>
-        <div>ユーザーID: {user?.profile?.sub}</div>
-        <div>Email: {user?.profile?.email}</div>
-        <div>Token有無: {user?.id_token ? '✅' : '❌'}</div>
-        <div style={{ fontSize: '10px', marginTop: '5px' }}>
-          ブラウザのコンソール(F12)でテスト結果を確認してください
-        </div>
-      </div>
-      {/* ===== デバッグ情報終了 ===== */}
-
       {/* サイドバー */}
       <div className="sidebar">
         {/* ヘッダー */}
@@ -328,14 +195,6 @@ function ChatScreen({ user, onSignOut }) {
 
 function App() {
   const auth = useAuth();
-
-  // ===== ここに追加 =====
-  // アプリ起動時の基本テスト
-  useEffect(() => {
-    console.log('🚀 アプリ起動 - AppSync基本設定テスト');
-    testAppSyncConnection();
-  }, []);
-  // ===== 追加終了 =====
 
   const signOutRedirect = () => {
     const clientId = "8pua3oe15pci4ci7m0misd8eu";
