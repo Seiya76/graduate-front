@@ -10,9 +10,9 @@ import config from './aws-exports'; //Appsync用のConfigをインポート
 Amplify.configure(config);
 
 const cognitoAuthConfig = {
-  authority: "https://cognito-idp.ap-northeast-1.amazonaws.com/ap-northeast-1_u9YhtfyWO",
-  client_id: "20dt0bgfusmmb24dleam55nlnc",
-  redirect_uri: "https://main.d3rgq9lalaa9gb.amplifyapp.com/",
+  authority: "https://cognito-idp.ap-northeast-1.amazonaws.com/ap-northeast-1_ncffAodBj",
+  client_id: "5buno8gs9brj93apmu9tvqqp77",
+  redirect_uri: "https://main.d3rgq9lalaa9gb.amplifyapp.com",
   response_type: "code",
   scope: "email openid",
 };
