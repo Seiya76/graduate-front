@@ -1,27 +1,68 @@
 /* eslint-disable */
 // this is an auto generated file. This will be overwritten
 
-export const createUser = /* GraphQL */ `
-  mutation CreateUser($input: CreateUserInput!) {
-    createUser(input: $input) {
+export const createChatRoom = /* GraphQL */ `
+  mutation CreateChatRoom($input: CreateChatRoomInput!) {
+    createChatRoom(input: $input) {
+      id
+      nickname
+      description
+      createdBy
+      memberCount
+      isPrivate
+      __typename
+    }
+  }
+`;
+export const updateChatRoom = /* GraphQL */ `
+  mutation UpdateChatRoom($input: UpdateChatRoomInput!) {
+    updateChatRoom(input: $input) {
+      id
+      nickname
+      description
+      createdBy
+      memberCount
+      isPrivate
+      __typename
+    }
+  }
+`;
+export const deleteChatRoom = /* GraphQL */ `
+  mutation DeleteChatRoom($input: DeleteChatRoomInput!) {
+    deleteChatRoom(input: $input) {
+      id
+      nickname
+      description
+      createdBy
+      memberCount
+      isPrivate
+      __typename
+    }
+  }
+`;
+export const updateUser = /* GraphQL */ `
+  mutation UpdateUser($input: UpdateUserInput!) {
+    updateUser(input: $input) {
       userId
-      username
-      email
-      displayName
       createdAt
+      email
+      emailVerified
+      nickname
+      status
       updatedAt
       __typename
     }
   }
 `;
-export const createChannel = /* GraphQL */ `
-  mutation CreateChannel($input: CreateChannelInput!) {
-    createChannel(input: $input) {
-      channelId
-      name
-      description
-      createdBy
+export const updateUserStatus = /* GraphQL */ `
+  mutation UpdateUserStatus($userId: String!, $status: String!) {
+    updateUserStatus(userId: $userId, status: $status) {
+      userId
       createdAt
+      email
+      emailVerified
+      nickname
+      status
       updatedAt
       __typename
     }
@@ -30,22 +71,41 @@ export const createChannel = /* GraphQL */ `
 export const createMessage = /* GraphQL */ `
   mutation CreateMessage($input: CreateMessageInput!) {
     createMessage(input: $input) {
-      channelId
-      createdAt
-      messageId
+      id
+      chatRoomId
       userId
       content
-      username
+      userNickname
+      replyToMessageId
+      createdAt
       __typename
     }
   }
 `;
-export const joinChannel = /* GraphQL */ `
-  mutation JoinChannel($channelId: ID!) {
-    joinChannel(channelId: $channelId) {
+export const updateMessage = /* GraphQL */ `
+  mutation UpdateMessage($input: UpdateMessageInput!) {
+    updateMessage(input: $input) {
+      id
+      chatRoomId
       userId
-      channelId
-      joinedAt
+      content
+      userNickname
+      replyToMessageId
+      createdAt
+      __typename
+    }
+  }
+`;
+export const deleteMessage = /* GraphQL */ `
+  mutation DeleteMessage($input: DeleteMessageInput!) {
+    deleteMessage(input: $input) {
+      id
+      chatRoomId
+      userId
+      content
+      userNickname
+      replyToMessageId
+      createdAt
       __typename
     }
   }

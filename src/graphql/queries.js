@@ -1,42 +1,33 @@
 /* eslint-disable */
 // this is an auto generated file. This will be overwritten
 
-export const getUser = /* GraphQL */ `
-  query GetUser($userId: ID!) {
-    getUser(userId: $userId) {
-      userId
-      username
-      email
-      displayName
-      createdAt
-      updatedAt
-      __typename
-    }
-  }
-`;
-export const getChannel = /* GraphQL */ `
-  query GetChannel($channelId: ID!) {
-    getChannel(channelId: $channelId) {
-      channelId
-      name
+export const getChatRoom = /* GraphQL */ `
+  query GetChatRoom($id: ID!) {
+    getChatRoom(id: $id) {
+      id
+      nickname
       description
       createdBy
-      createdAt
-      updatedAt
+      memberCount
+      isPrivate
       __typename
     }
   }
 `;
-export const listMessages = /* GraphQL */ `
-  query ListMessages($channelId: ID!, $limit: Int, $nextToken: String) {
-    listMessages(channelId: $channelId, limit: $limit, nextToken: $nextToken) {
+export const listChatRooms = /* GraphQL */ `
+  query ListChatRooms(
+    $filter: TableChatRoomFilterInput
+    $limit: Int
+    $nextToken: String
+  ) {
+    listChatRooms(filter: $filter, limit: $limit, nextToken: $nextToken) {
       items {
-        channelId
-        createdAt
-        messageId
-        userId
-        content
-        username
+        id
+        nickname
+        description
+        createdBy
+        memberCount
+        isPrivate
         __typename
       }
       nextToken
@@ -44,12 +35,66 @@ export const listMessages = /* GraphQL */ `
     }
   }
 `;
-export const getUserChannels = /* GraphQL */ `
-  query GetUserChannels($userId: ID!) {
-    getUserChannels(userId: $userId) {
+export const getUser = /* GraphQL */ `
+  query GetUser($userId: String!) {
+    getUser(userId: $userId) {
       userId
-      channelId
-      joinedAt
+      createdAt
+      email
+      emailVerified
+      nickname
+      status
+      updatedAt
+      __typename
+    }
+  }
+`;
+export const listOnlineUsers = /* GraphQL */ `
+  query ListOnlineUsers {
+    listOnlineUsers {
+      userId
+      createdAt
+      email
+      emailVerified
+      nickname
+      status
+      updatedAt
+      __typename
+    }
+  }
+`;
+export const getMessage = /* GraphQL */ `
+  query GetMessage($chatRoomId: String!, $createdAt: AWSDateTime!) {
+    getMessage(chatRoomId: $chatRoomId, createdAt: $createdAt) {
+      id
+      chatRoomId
+      userId
+      content
+      userNickname
+      replyToMessageId
+      createdAt
+      __typename
+    }
+  }
+`;
+export const listMessages = /* GraphQL */ `
+  query ListMessages(
+    $filter: TableMessageFilterInput
+    $limit: Int
+    $nextToken: String
+  ) {
+    listMessages(filter: $filter, limit: $limit, nextToken: $nextToken) {
+      items {
+        id
+        chatRoomId
+        userId
+        content
+        userNickname
+        replyToMessageId
+        createdAt
+        __typename
+      }
+      nextToken
       __typename
     }
   }
