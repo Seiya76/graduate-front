@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import logo from "./logo.svg";
 import "./App.css";
-import { Amplify, Auth, API } from 'aws-amplify';
+import { useAuth } from "react-oidc-context";
+import { Amplify, API, Auth } from 'aws-amplify';
 import config from './aws-exports.js';
-import { getCurrentUser } from './graphql/queries';
+import { getCurrentUser, getUser } from './graphql/queries';
 
 Amplify.configure(config);
 
@@ -55,9 +56,16 @@ function ChatScreen({ user, onSignOut, currentUserData }) {
 
   // ユーザー名の取得（DynamoDBデータを優先）
   const getUserDisplayName = () => {
+    // 1. DynamoDBのnicknameを優先
     if (currentUserData?.nickname) return currentUserData.nickname;
-    if (user?.username) return user.username;
-    if (user?.attributes?.email) return user.attributes.email.split('@')[0];
+    
+    // 2. OIDC profileのnameを使用
+    if (user.profile.name) return user.profile.name;
+    
+    // 3. emailのローカル部分を使用
+    if (user.profile.email) return user.profile.email.split('@')[0];
+    
+    // 4. フォールバック
     return "ユーザー";
   };
 
@@ -114,11 +122,18 @@ function ChatScreen({ user, onSignOut, currentUserData }) {
             <div className="user-details">
               <div className="user-name">{getUserDisplayName()}</div>
               <div className="user-status">
-                {currentUserData?.status || 'オンライン'}
+                <span className="status-text">
+                  {currentUserData?.status || 'オンライン'}
+                </span>
                 {currentUserData?.emailVerified && (
                   <span className="verified-badge" title="メール認証済み">✓</span>
                 )}
               </div>
+              {currentUserData ? (
+                <div className="user-email">{currentUserData.email}</div>
+              ) : (
+                <div className="user-email">{user.profile.email}</div>
+              )}
             </div>
           </div>
         </div>
@@ -228,132 +243,124 @@ function ChatScreen({ user, onSignOut, currentUserData }) {
 }
 
 function App() {
-  const [user, setUser] = useState(null);
+  const auth = useAuth();
   const [currentUserData, setCurrentUserData] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [isLoadingUserData, setIsLoadingUserData] = useState(false);
+  const [userDataError, setUserDataError] = useState(null);
 
-  // 認証状態とユーザーデータの取得
+  // 認証完了後にDynamoDBからユーザーデータを取得
   useEffect(() => {
-    checkAuthState();
-  }, []);
-
-  const checkAuthState = async () => {
-    try {
-      setIsLoading(true);
-      // Cognito認証状態をチェック
-      const currentUser = await Auth.currentAuthenticatedUser();
-      console.log('Current authenticated user:', currentUser);
-      setUser(currentUser);
-
-      // DynamoDBからユーザー詳細情報を取得
-      await fetchCurrentUserData();
-      
-    } catch (error) {
-      console.log('User not authenticated:', error);
-      setUser(null);
+    if (auth.isAuthenticated && auth.user) {
+      fetchCurrentUserData();
+    } else {
       setCurrentUserData(null);
-    } finally {
-      setIsLoading(false);
+      setUserDataError(null);
     }
-  };
+  }, [auth.isAuthenticated, auth.user]);
 
   const fetchCurrentUserData = async () => {
     try {
+      setIsLoadingUserData(true);
+      setUserDataError(null);
+
+      // OIDCトークンを使用してAmplify Authに認証情報を設定
+      if (auth.user?.access_token) {
+        // アクセストークンをAmplifyに設定
+        const credentials = await Auth.federatedSignIn(
+          'cognito-idp',
+          {
+            token: auth.user.access_token,
+            expires_at: auth.user.expires_at
+          },
+          auth.user
+        );
+        console.log('Amplify credentials set:', credentials);
+      }
+
+      // CognitoのsubIdを使用してDynamoDBからユーザー情報を取得
+      const userId = auth.user.profile.sub;
+      console.log('Fetching user data for userId:', userId);
+
       const result = await API.graphql({
-        query: getCurrentUser,
+        query: getUser,
+        variables: { userId: userId },
         authMode: 'AMAZON_COGNITO_USER_POOLS'
       });
 
       console.log('GraphQL result:', result);
-      setCurrentUserData(result.data.getCurrentUser);
-      
+      setCurrentUserData(result.data.getUser);
+
     } catch (error) {
       console.error('Error fetching user data from DynamoDB:', error);
-      setError(error);
+      setUserDataError(error);
+      
+      // エラーログの詳細を出力
+      if (error.errors) {
+        console.error('GraphQL errors:', error.errors);
+      }
+    } finally {
+      setIsLoadingUserData(false);
     }
   };
 
-  const signIn = () => {
-    Auth.federatedSignIn()
-      .then(() => {
-        console.log('Sign in initiated');
-        // 認証後の状態チェックはAuth.onAuthStateChangeで処理される
-      })
-      .catch(err => {
-        console.error('Sign in error:', err);
-        setError(err);
-      });
+  const signOutRedirect = () => {
+    const clientId = "5buno8gs9brj93apmu9tvqqp77";
+    const logoutUri = "https://main.d3rgq9lalaa9gb.amplifyapp.com";
+    const cognitoDomain = "https://ap-northeast-1ncffaodbj.auth.ap-northeast-1.amazoncognito.com";
+    window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`;
   };
 
-  const signOut = async () => {
-    try {
-      await Auth.signOut();
-      setUser(null);
-      setCurrentUserData(null);
-      
-      // カスタムログアウトURLへリダイレクト
-      const clientId = "5buno8gs9brj93apmu9tvqqp77";
-      const logoutUri = "https://main.d3rgq9lalaa9gb.amplifyapp.com";
-      const cognitoDomain = "https://ap-northeast-1ncffaodbj.auth.ap-northeast-1.amazoncognito.com";
-      window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`;
-      
-    } catch (error) {
-      console.error('Sign out error:', error);
-    }
-  };
-
-  // 認証状態の変更を監視
-  useEffect(() => {
-    const unsubscribe = Auth.onAuthStateChange((authState, authUser) => {
-      console.log('Auth state changed:', authState, authUser);
-      
-      if (authState === 'signedIn') {
-        setUser(authUser);
-        fetchCurrentUserData();
-      } else if (authState === 'signedOut') {
-        setUser(null);
-        setCurrentUserData(null);
-      }
-    });
-
-    return () => {
-      if (typeof unsubscribe === 'function') {
-        unsubscribe();
-      }
-    };
-  }, []);
-
-  if (isLoading) {
+  if (auth.isLoading) {
     return (
       <div className="loading-screen">
         <div className="loading-spinner"></div>
-        <div>読み込み中...</div>
+        <div>認証情報を読み込み中...</div>
       </div>
     );
   }
 
-  if (error && !user) {
+  if (auth.error) {
     return (
       <div className="error-screen">
         <div className="error-message">
-          エラーが発生しました: {error.message}
+          認証エラーが発生しました: {auth.error.message}
         </div>
-        <button onClick={checkAuthState} className="retry-btn">
-          再試行
+        <button onClick={() => window.location.reload()} className="retry-btn">
+          再読み込み
         </button>
       </div>
     );
   }
 
   // 認証済みの場合はチャット画面を表示
-  if (user) {
+  if (auth.isAuthenticated) {
     return (
-      <ChatScreen 
-        user={user} 
-        currentUserData={currentUserData}
-        onSignOut={signOut} 
-      />
+      <div>
+        {/* ユーザーデータの読み込み状態を表示 */}
+        {isLoadingUserData && (
+          <div className="user-data-loading">
+            <small>ユーザー情報を読み込み中...</small>
+          </div>
+        )}
+        
+        {/* ユーザーデータ取得エラーの表示（アプリは続行） */}
+        {userDataError && !currentUserData && (
+          <div className="user-data-error">
+            <small>
+              ユーザー詳細情報の取得に失敗しました
+              <button onClick={fetchCurrentUserData} className="retry-small-btn">
+                再試行
+              </button>
+            </small>
+          </div>
+        )}
+
+        <ChatScreen 
+          user={auth.user} 
+          currentUserData={currentUserData}
+          onSignOut={signOutRedirect} 
+        />
+      </div>
     );
   }
 
@@ -365,7 +372,7 @@ function App() {
         <h1>G00gleChat</h1>
         <div className="auth-buttons">
           <button 
-            onClick={signIn} 
+            onClick={() => auth.signinRedirect()} 
             className="signin-btn"
           >
             サインイン
