@@ -7,6 +7,35 @@ import config from './aws-exports.js';
 
 Amplify.configure(config);
 
+// ユーザー情報表示コンポーネント
+function UserProfile({ user, onSignOut }) {
+  // nickname属性を取得、なければemailの@より前の部分を使用
+  const displayName = user?.profile?.nickname || 
+                     user?.profile?.name || 
+                     user?.profile?.email?.split('@')[0] || 
+                     'ユーザー';
+  
+  // アバター用の文字（nicknameの最初の2文字）
+  const avatarText = displayName.substring(0, 2).toUpperCase();
+
+  return (
+    <div className="user-profile">
+      <div className="user-info">
+        <div className="user-avatar">
+          {avatarText}
+        </div>
+        <div className="user-details">
+          <div className="username">{displayName}</div>
+          <div className="user-email">{user?.profile?.email}</div>
+        </div>
+      </div>
+      <button className="signout-btn" onClick={onSignOut} title="サインアウト">
+        ログアウト
+      </button>
+    </div>
+  );
+}
+
 // Google Chat風のチャット画面コンポーネント
 function ChatScreen({ user, onSignOut }) {
   const [selectedSpace, setSelectedSpace] = useState("ホーム");
@@ -55,16 +84,22 @@ function ChatScreen({ user, onSignOut }) {
 
   const sendMessage = () => {
     if (newMessage.trim()) {
+      // nickname属性を使用してメッセージ送信者名を設定
+      const senderName = user?.profile?.nickname || 
+                        user?.profile?.name || 
+                        user?.profile?.email?.split('@')[0] || 
+                        'ユーザー';
+      
       const message = {
         id: messages.length + 1,
-        sender: user.profile.name || user.profile.email.split('@')[0],
+        sender: senderName,
         content: newMessage,
         time: new Date().toLocaleTimeString('ja-JP', { 
           hour: '2-digit', 
           minute: '2-digit' 
         }),
         isOwn: true,
-        avatar: user.profile.name ? user.profile.name.substring(0, 2).toUpperCase() : user.profile.email.substring(0, 2).toUpperCase()
+        avatar: senderName.substring(0, 2).toUpperCase()
       };
       setMessages([...messages, message]);
       setNewMessage("");
@@ -89,7 +124,7 @@ function ChatScreen({ user, onSignOut }) {
           </div>
           <div className="header-actions">
             <button className="icon-btn search-btn" title="検索"></button>
-            <button className="icon-btn signout-btn" onClick={onSignOut} title="サインアウト"></button>
+            <button className="icon-btn menu-btn" title="メニュー"></button>
           </div>
         </div>
 
@@ -132,7 +167,7 @@ function ChatScreen({ user, onSignOut }) {
 
       {/* メインコンテンツ */}
       <div className="main-content">
-        {/* チャットヘッダー */}
+        {/* チャットヘッダー - ユーザー情報を右上に追加 */}
         <div className="chat-header">
           <div className="chat-info">
             <h2 className="chat-title">{selectedSpace}</h2>
@@ -142,6 +177,8 @@ function ChatScreen({ user, onSignOut }) {
             <button className="action-btn">未読</button>
             <button className="action-btn">スレッド</button>
             <button className="icon-btn pin-btn" title="ピン留め"></button>
+            {/* ユーザープロフィールを右上に配置 */}
+            <UserProfile user={user} onSignOut={onSignOut} />
           </div>
         </div>
 
