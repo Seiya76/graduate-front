@@ -1,57 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import logo from "./logo.svg";
 import "./App.css";
-import { useAuth } from "react-oidc-context";
-import { Amplify } from 'aws-amplify';
+import { Amplify, Auth, API } from 'aws-amplify';
 import config from './aws-exports.js';
+import { getCurrentUser } from './graphql/queries';
 
 Amplify.configure(config);
 
-// ユーザー情報表示コンポーネント
-function UserProfile({ user, onSignOut }) {
-  // デバッグ用：ユーザー情報をコンソールに出力
-  console.log('User object:', user);
-  console.log('User profile:', user?.profile);
-  console.log('Available attributes:', Object.keys(user?.profile || {}));
-  
-  // nickname属性を取得、なければemailの@より前の部分を使用
-  const displayName = user?.profile?.nickname || 
-                     user?.profile?.name || 
-                     user?.profile?.preferred_username ||
-                     user?.profile?.given_name ||
-                     user?.profile?.family_name ||
-                     user?.profile?.email?.split('@')[0] || 
-                     'ユーザー';
-  
-  console.log('Display name:', displayName);
-  
-  // アバター用の文字（nicknameの最初の2文字）
-  const avatarText = displayName.substring(0, 2).toUpperCase();
-
-  return (
-    <div className="user-profile">
-      <div className="user-info">
-        <div className="user-avatar">
-          {avatarText}
-        </div>
-        <div className="user-details">
-          <div className="username">{displayName}</div>
-          <div className="user-email">{user?.profile?.email}</div>
-          {/* デバッグ情報 - 一時的に表示 */}
-          <div style={{ fontSize: '10px', color: '#999' }}>
-            Debug: {JSON.stringify(user?.profile?.nickname || 'no nickname')}
-          </div>
-        </div>
-      </div>
-      <button className="signout-btn" onClick={onSignOut} title="サインアウト">
-        ログアウト
-      </button>
-    </div>
-  );
-}
-
 // Google Chat風のチャット画面コンポーネント
-function ChatScreen({ user, onSignOut }) {
+function ChatScreen({ user, onSignOut, currentUserData }) {
   const [selectedSpace, setSelectedSpace] = useState("ホーム");
   const [messages, setMessages] = useState([
     {
@@ -96,27 +53,32 @@ function ChatScreen({ user, onSignOut }) {
     { name: "山田美咲", lastMessage: "新しいデザインはいかがですか？", time: "昨日", avatar: "YM" }
   ];
 
+  // ユーザー名の取得（DynamoDBデータを優先）
+  const getUserDisplayName = () => {
+    if (currentUserData?.nickname) return currentUserData.nickname;
+    if (user?.username) return user.username;
+    if (user?.attributes?.email) return user.attributes.email.split('@')[0];
+    return "ユーザー";
+  };
+
+  // アバター用の文字を取得
+  const getUserAvatar = () => {
+    const name = getUserDisplayName();
+    return name.substring(0, 2).toUpperCase();
+  };
+
   const sendMessage = () => {
     if (newMessage.trim()) {
-      // nickname属性を使用してメッセージ送信者名を設定
-      const senderName = user?.profile?.nickname || 
-                        user?.profile?.name || 
-                        user?.profile?.preferred_username ||
-                        user?.profile?.given_name ||
-                        user?.profile?.family_name ||
-                        user?.profile?.email?.split('@')[0] || 
-                        'ユーザー';
-      
       const message = {
         id: messages.length + 1,
-        sender: senderName,
+        sender: getUserDisplayName(),
         content: newMessage,
         time: new Date().toLocaleTimeString('ja-JP', { 
           hour: '2-digit', 
           minute: '2-digit' 
         }),
         isOwn: true,
-        avatar: senderName.substring(0, 2).toUpperCase()
+        avatar: getUserAvatar()
       };
       setMessages([...messages, message]);
       setNewMessage("");
@@ -141,7 +103,23 @@ function ChatScreen({ user, onSignOut }) {
           </div>
           <div className="header-actions">
             <button className="icon-btn search-btn" title="検索"></button>
-            <button className="icon-btn menu-btn" title="メニュー"></button>
+            <button className="icon-btn signout-btn" onClick={onSignOut} title="サインアウト"></button>
+          </div>
+        </div>
+
+        {/* ユーザー情報表示 */}
+        <div className="user-info-section">
+          <div className="current-user-info">
+            <div className="user-avatar large">{getUserAvatar()}</div>
+            <div className="user-details">
+              <div className="user-name">{getUserDisplayName()}</div>
+              <div className="user-status">
+                {currentUserData?.status || 'オンライン'}
+                {currentUserData?.emailVerified && (
+                  <span className="verified-badge" title="メール認証済み">✓</span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -184,7 +162,7 @@ function ChatScreen({ user, onSignOut }) {
 
       {/* メインコンテンツ */}
       <div className="main-content">
-        {/* チャットヘッダー - ユーザー情報を右上に追加 */}
+        {/* チャットヘッダー */}
         <div className="chat-header">
           <div className="chat-info">
             <h2 className="chat-title">{selectedSpace}</h2>
@@ -194,8 +172,6 @@ function ChatScreen({ user, onSignOut }) {
             <button className="action-btn">未読</button>
             <button className="action-btn">スレッド</button>
             <button className="icon-btn pin-btn" title="ピン留め"></button>
-            {/* ユーザープロフィールを右上に配置 */}
-            <UserProfile user={user} onSignOut={onSignOut} />
           </div>
         </div>
 
@@ -252,16 +228,103 @@ function ChatScreen({ user, onSignOut }) {
 }
 
 function App() {
-  const auth = useAuth();
+  const [user, setUser] = useState(null);
+  const [currentUserData, setCurrentUserData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const signOutRedirect = () => {
-    const clientId = "5buno8gs9brj93apmu9tvqqp77";
-    const logoutUri = "https://main.d3rgq9lalaa9gb.amplifyapp.com";
-    const cognitoDomain = "https://ap-northeast-1ncffaodbj.auth.ap-northeast-1.amazoncognito.com";
-    window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`;
+  // 認証状態とユーザーデータの取得
+  useEffect(() => {
+    checkAuthState();
+  }, []);
+
+  const checkAuthState = async () => {
+    try {
+      setIsLoading(true);
+      // Cognito認証状態をチェック
+      const currentUser = await Auth.currentAuthenticatedUser();
+      console.log('Current authenticated user:', currentUser);
+      setUser(currentUser);
+
+      // DynamoDBからユーザー詳細情報を取得
+      await fetchCurrentUserData();
+      
+    } catch (error) {
+      console.log('User not authenticated:', error);
+      setUser(null);
+      setCurrentUserData(null);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  if (auth.isLoading) {
+  const fetchCurrentUserData = async () => {
+    try {
+      const result = await API.graphql({
+        query: getCurrentUser,
+        authMode: 'AMAZON_COGNITO_USER_POOLS'
+      });
+
+      console.log('GraphQL result:', result);
+      setCurrentUserData(result.data.getCurrentUser);
+      
+    } catch (error) {
+      console.error('Error fetching user data from DynamoDB:', error);
+      setError(error);
+    }
+  };
+
+  const signIn = () => {
+    Auth.federatedSignIn()
+      .then(() => {
+        console.log('Sign in initiated');
+        // 認証後の状態チェックはAuth.onAuthStateChangeで処理される
+      })
+      .catch(err => {
+        console.error('Sign in error:', err);
+        setError(err);
+      });
+  };
+
+  const signOut = async () => {
+    try {
+      await Auth.signOut();
+      setUser(null);
+      setCurrentUserData(null);
+      
+      // カスタムログアウトURLへリダイレクト
+      const clientId = "5buno8gs9brj93apmu9tvqqp77";
+      const logoutUri = "https://main.d3rgq9lalaa9gb.amplifyapp.com";
+      const cognitoDomain = "https://ap-northeast-1ncffaodbj.auth.ap-northeast-1.amazoncognito.com";
+      window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`;
+      
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
+  // 認証状態の変更を監視
+  useEffect(() => {
+    const unsubscribe = Auth.onAuthStateChange((authState, authUser) => {
+      console.log('Auth state changed:', authState, authUser);
+      
+      if (authState === 'signedIn') {
+        setUser(authUser);
+        fetchCurrentUserData();
+      } else if (authState === 'signedOut') {
+        setUser(null);
+        setCurrentUserData(null);
+      }
+    });
+
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, []);
+
+  if (isLoading) {
     return (
       <div className="loading-screen">
         <div className="loading-spinner"></div>
@@ -270,19 +333,28 @@ function App() {
     );
   }
 
-  if (auth.error) {
+  if (error && !user) {
     return (
       <div className="error-screen">
         <div className="error-message">
-          エラーが発生しました: {auth.error.message}
+          エラーが発生しました: {error.message}
         </div>
+        <button onClick={checkAuthState} className="retry-btn">
+          再試行
+        </button>
       </div>
     );
   }
 
   // 認証済みの場合はチャット画面を表示
-  if (auth.isAuthenticated) {
-    return <ChatScreen user={auth.user} onSignOut={signOutRedirect} />;
+  if (user) {
+    return (
+      <ChatScreen 
+        user={user} 
+        currentUserData={currentUserData}
+        onSignOut={signOut} 
+      />
+    );
   }
 
   // 未認証の場合はログイン画面を表示
@@ -293,7 +365,7 @@ function App() {
         <h1>G00gleChat</h1>
         <div className="auth-buttons">
           <button 
-            onClick={() => auth.signinRedirect()} 
+            onClick={signIn} 
             className="signin-btn"
           >
             サインイン
