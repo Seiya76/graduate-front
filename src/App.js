@@ -1,15 +1,17 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import logo from "./logo.svg";
 import "./App.css";
 import { useAuth } from "react-oidc-context";
-import { Amplify } from 'aws-amplify';
+import { Amplify, API } from 'aws-amplify';
 import config from './aws-exports.js';
+import { getCurrentUser } from './graphql/queries';
 
 Amplify.configure(config);
 
 // Google Chat風のチャット画面コンポーネント
 function ChatScreen({ user, onSignOut }) {
   const [selectedSpace, setSelectedSpace] = useState("ホーム");
+  const [currentUser, setCurrentUser] = useState(null);
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -53,18 +55,36 @@ function ChatScreen({ user, onSignOut }) {
     { name: "山田美咲", lastMessage: "新しいデザインはいかがですか？", time: "昨日", avatar: "YM" }
   ];
 
+  // AppSyncからユーザー情報を取得
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const result = await API.graphql({
+          query: getCurrentUser,
+          authMode: 'AMAZON_COGNITO_USER_POOLS'
+        });
+        setCurrentUser(result.data.getCurrentUser);
+      } catch (error) {
+        console.error('Error fetching current user:', error);
+      }
+    };
+
+    fetchCurrentUser();
+  }, []);
+
   const sendMessage = () => {
     if (newMessage.trim()) {
+      const displayName = currentUser?.nickname || user.profile.name || user.profile.email.split('@')[0];
       const message = {
         id: messages.length + 1,
-        sender: user.profile.name || user.profile.email.split('@')[0],
+        sender: displayName,
         content: newMessage,
         time: new Date().toLocaleTimeString('ja-JP', { 
           hour: '2-digit', 
           minute: '2-digit' 
         }),
         isOwn: true,
-        avatar: user.profile.name ? user.profile.name.substring(0, 2).toUpperCase() : user.profile.email.substring(0, 2).toUpperCase()
+        avatar: displayName.substring(0, 2).toUpperCase()
       };
       setMessages([...messages, message]);
       setNewMessage("");
