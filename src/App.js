@@ -2,11 +2,14 @@ import React, { useState, useEffect } from "react";
 import logo from "./logo.svg";
 import "./App.css";
 import { useAuth } from "react-oidc-context";
-import { Amplify, API } from 'aws-amplify';
+import { Amplify } from 'aws-amplify';
+import { generateClient } from 'aws-amplify/api';
 import config from './aws-exports.js';
 import { getCurrentUser } from './graphql/queries';
 
 Amplify.configure(config);
+
+const client = generateClient();
 
 // Google Chat風のチャット画面コンポーネント
 function ChatScreen({ user, onSignOut }) {
@@ -59,9 +62,9 @@ function ChatScreen({ user, onSignOut }) {
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
-        const result = await API.graphql({
+        const result = await client.graphql({
           query: getCurrentUser,
-          authMode: 'AMAZON_COGNITO_USER_POOLS'
+          authMode: 'userPool'
         });
         setCurrentUser(result.data.getCurrentUser);
       } catch (error) {
