@@ -5,7 +5,7 @@ import { useAuth } from "react-oidc-context";
 import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/api';
 import config from './aws-exports.js';
-import { getCurrentUser } from './graphql/queries';
+import { getCurrentUser, getUser } from './graphql/queries';
 
 Amplify.configure(config);
 
@@ -62,18 +62,35 @@ function ChatScreen({ user, onSignOut }) {
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
+        // OIDC認証のsubを使ってDynamoDBからユーザー情報を取得
+        const oidcSub = user.profile.sub;
+        console.log('OIDC sub:', oidcSub);
+        
         const result = await client.graphql({
-          query: getCurrentUser,
-          authMode: 'userPool'
+          query: getUser,
+          variables: { userId: oidcSub },
+          authMode: 'iam' // IAM認証を使用
         });
-        setCurrentUser(result.data.getCurrentUser);
+        
+        console.log('User data:', result.data.getUser);
+        setCurrentUser(result.data.getUser);
       } catch (error) {
         console.error('Error fetching current user:', error);
+        
+        // エラーの場合はOIDC情報をフォールバックとして使用
+        const fallbackUser = {
+          userId: user.profile.sub,
+          nickname: user.profile.name || user.profile.preferred_username,
+          email: user.profile.email
+        };
+        setCurrentUser(fallbackUser);
       }
     };
 
-    fetchCurrentUser();
-  }, []);
+    if (user?.profile?.sub) {
+      fetchCurrentUser();
+    }
+  }, [user]);
 
   const sendMessage = () => {
     if (newMessage.trim()) {
