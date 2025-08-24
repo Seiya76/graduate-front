@@ -5,11 +5,39 @@ import { useAuth } from "react-oidc-context";
 import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/api';
 import config from './aws-exports.js';
-import { getCurrentUser, getUser } from './graphql/queries';
 
 Amplify.configure(config);
 
 const client = generateClient();
+
+// GraphQLクエリを直接定義
+const GET_USER = `
+  query GetUser($userId: ID!) {
+    getUser(userId: $userId) {
+      userId
+      createdAt
+      email
+      emailVerified
+      nickname
+      status
+      updatedAt
+    }
+  }
+`;
+
+const GET_USER_BY_EMAIL = `
+  query GetUserByEmail($email: String!) {
+    getUserByEmail(email: $email) {
+      userId
+      createdAt
+      email
+      emailVerified
+      nickname
+      status
+      updatedAt
+    }
+  }
+`;
 
 // Google Chat風のチャット画面コンポーネント
 function ChatScreen({ user, onSignOut }) {
@@ -62,26 +90,69 @@ function ChatScreen({ user, onSignOut }) {
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
-        // OIDC認証のsubを使ってDynamoDBからユーザー情報を取得
         const oidcSub = user.profile.sub;
+        const email = user.profile.email;
+        
         console.log('OIDC sub:', oidcSub);
+        console.log('OIDC email:', email);
         
-        const result = await client.graphql({
-          query: getUser,
-          variables: { userId: oidcSub },
-          authMode: 'iam' // IAM認証を使用
-        });
+        let result = null;
         
-        console.log('User data:', result.data.getUser);
-        setCurrentUser(result.data.getUser);
+        // まずuserIdで検索を試す
+        try {
+          result = await client.graphql({
+            query: GET_USER,
+            variables: { userId: oidcSub },
+            authMode: 'apiKey'
+          });
+          
+          if (result.data.getUser) {
+            console.log('User found by userId:', result.data.getUser);
+            setCurrentUser(result.data.getUser);
+            return;
+          }
+        } catch (userIdError) {
+          console.log('User not found by userId, trying email...');
+        }
+        
+        // userIdで見つからない場合、emailで検索
+        if (email) {
+          try {
+            result = await client.graphql({
+              query: GET_USER_BY_EMAIL,
+              variables: { email: email },
+              authMode: 'apiKey'
+            });
+            
+            if (result.data.getUserByEmail) {
+              console.log('User found by email:', result.data.getUserByEmail);
+              setCurrentUser(result.data.getUserByEmail);
+              return;
+            }
+          } catch (emailError) {
+            console.log('User not found by email either');
+          }
+        }
+        
+        // DynamoDBにデータがない場合はOIDC情報をフォールバック
+        console.log('Using OIDC profile as fallback');
+        const fallbackUser = {
+          userId: oidcSub,
+          nickname: user.profile.name || user.profile.preferred_username,
+          email: email,
+          status: 'active'
+        };
+        setCurrentUser(fallbackUser);
+        
       } catch (error) {
         console.error('Error fetching current user:', error);
         
-        // エラーの場合はOIDC情報をフォールバックとして使用
+        // エラーの場合もOIDC情報をフォールバック
         const fallbackUser = {
           userId: user.profile.sub,
           nickname: user.profile.name || user.profile.preferred_username,
-          email: user.profile.email
+          email: user.profile.email,
+          status: 'active'
         };
         setCurrentUser(fallbackUser);
       }
