@@ -9,11 +9,21 @@ Amplify.configure(config);
 
 // ユーザー情報表示コンポーネント
 function UserProfile({ user, onSignOut }) {
+  // デバッグ用：ユーザー情報をコンソールに出力
+  console.log('User object:', user);
+  console.log('User profile:', user?.profile);
+  console.log('Available attributes:', Object.keys(user?.profile || {}));
+  
   // nickname属性を取得、なければemailの@より前の部分を使用
   const displayName = user?.profile?.nickname || 
                      user?.profile?.name || 
+                     user?.profile?.preferred_username ||
+                     user?.profile?.given_name ||
+                     user?.profile?.family_name ||
                      user?.profile?.email?.split('@')[0] || 
                      'ユーザー';
+  
+  console.log('Display name:', displayName);
   
   // アバター用の文字（nicknameの最初の2文字）
   const avatarText = displayName.substring(0, 2).toUpperCase();
@@ -27,6 +37,10 @@ function UserProfile({ user, onSignOut }) {
         <div className="user-details">
           <div className="username">{displayName}</div>
           <div className="user-email">{user?.profile?.email}</div>
+          {/* デバッグ情報 - 一時的に表示 */}
+          <div style={{ fontSize: '10px', color: '#999' }}>
+            Debug: {JSON.stringify(user?.profile?.nickname || 'no nickname')}
+          </div>
         </div>
       </div>
       <button className="signout-btn" onClick={onSignOut} title="サインアウト">
@@ -87,6 +101,9 @@ function ChatScreen({ user, onSignOut }) {
       // nickname属性を使用してメッセージ送信者名を設定
       const senderName = user?.profile?.nickname || 
                         user?.profile?.name || 
+                        user?.profile?.preferred_username ||
+                        user?.profile?.given_name ||
+                        user?.profile?.family_name ||
                         user?.profile?.email?.split('@')[0] || 
                         'ユーザー';
       
