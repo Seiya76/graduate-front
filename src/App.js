@@ -189,6 +189,16 @@ function ChatScreen({ user, onSignOut }) {
     }
   };
 
+  // 表示名の取得
+  const getDisplayName = () => {
+    return currentUser?.nickname || user.profile.name || user.profile.email.split('@')[0];
+  };
+
+  const getDisplayAvatar = () => {
+    const name = getDisplayName();
+    return name.substring(0, 2).toUpperCase();
+  };
+
   return (
     <div className="chat-app">
       {/* サイドバー */}
@@ -253,6 +263,15 @@ function ChatScreen({ user, onSignOut }) {
             <button className="action-btn">未読</button>
             <button className="action-btn">スレッド</button>
             <button className="icon-btn pin-btn" title="ピン留め"></button>
+            
+            {/* ユーザー情報表示 */}
+            <div className="user-profile-display">
+              <div className="user-avatar-display">{getDisplayAvatar()}</div>
+              <div className="user-info-display">
+                <div className="user-name-display">{getDisplayName()}</div>
+                <div className="user-status-display">{currentUser?.status || 'active'}</div>
+              </div>
+            </div>
           </div>
         </div>
 
