@@ -29,3 +29,39 @@ export const getUser = /* GraphQL */ `
     }
   }
 `;
+export const getUserRooms = /* GraphQL */ `
+  query GetUserRooms($userId: ID!, $limit: Int, $nextToken: String) {
+    getUserRooms(userId: $userId, limit: $limit, nextToken: $nextToken) {
+      items {
+        roomId
+        roomName
+        roomType
+        createdBy
+        createdAt
+        lastMessage
+        lastMessageAt
+        memberCount
+        updatedAt
+        __typename
+      }
+      nextToken
+      __typename
+    }
+  }
+`;
+export const getRoom = /* GraphQL */ `
+  query GetRoom($roomId: ID!) {
+    getRoom(roomId: $roomId) {
+      roomId
+      roomName
+      roomType
+      createdBy
+      createdAt
+      lastMessage
+      lastMessageAt
+      memberCount
+      updatedAt
+      __typename
+    }
+  }
+`;
