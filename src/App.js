@@ -39,10 +39,76 @@ const GET_USER_BY_EMAIL = `
   }
 `;
 
+// ルーム関連のGraphQLクエリ
+const GET_USER_ROOMS = `
+  query GetUserRooms($userId: ID!, $limit: Int, $nextToken: String) {
+    getUserRooms(userId: $userId, limit: $limit, nextToken: $nextToken) {
+      items {
+        roomId
+        roomName
+        roomType
+        createdBy
+        lastMessage
+        lastMessageAt
+        memberCount
+        updatedAt
+      }
+      nextToken
+    }
+  }
+`;
+
+const CREATE_GROUP_ROOM = `
+  mutation CreateGroupRoom($input: CreateGroupRoomInput!) {
+    createGroupRoom(input: $input) {
+      roomId
+      roomName
+      roomType
+      createdBy
+      createdAt
+      memberCount
+      updatedAt
+    }
+  }
+`;
+
+const CREATE_DIRECT_ROOM = `
+  mutation CreateDirectRoom($targetUserId: ID!, $createdBy: ID!) {
+    createDirectRoom(targetUserId: $targetUserId, createdBy: $createdBy) {
+      roomId
+      roomName
+      roomType
+      createdBy
+      createdAt
+      memberCount
+      updatedAt
+    }
+  }
+`;
+
+const LIST_ALL_USERS = `
+  query ListUsers($limit: Int, $nextToken: String) {
+    listUsers(limit: $limit, nextToken: $nextToken) {
+      items {
+        userId
+        nickname
+        email
+        status
+      }
+      nextToken
+    }
+  }
+`;
+
 // Google Chat風のチャット画面コンポーネント
 function ChatScreen({ user, onSignOut }) {
   const [selectedSpace, setSelectedSpace] = useState("ホーム");
   const [currentUser, setCurrentUser] = useState(null);
+  const [userRooms, setUserRooms] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+  const [newRoomName, setNewRoomName] = useState("");
+  const [selectedUsers, setSelectedUsers] = useState([]);
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -70,21 +136,6 @@ function ChatScreen({ user, onSignOut }) {
     }
   ]);
   const [newMessage, setNewMessage] = useState("");
-
-  const spaces = [
-    { name: "ホーム", icon: "home", type: "home" },
-    { name: "開発チーム", icon: "team", type: "space" },
-    { name: "マーケティング", icon: "chart", type: "space" },
-    { name: "デザイン", icon: "design", type: "space" },
-    { name: "プロジェクトA", icon: "folder", type: "space" }
-  ];
-
-  const recentChats = [
-    { name: "田中太郎", lastMessage: "資料の件、確認しました", time: "11:54", avatar: "TT" },
-    { name: "佐藤花子", lastMessage: "会議の時間を変更できますか？", time: "11:30", avatar: "SH" },
-    { name: "鈴木一郎", lastMessage: "今日はお疲れ様でした", time: "昨日", avatar: "SI" },
-    { name: "山田美咲", lastMessage: "新しいデザインはいかがですか？", time: "昨日", avatar: "YM" }
-  ];
 
   // AppSyncからユーザー情報を取得
   useEffect(() => {
@@ -163,6 +214,134 @@ function ChatScreen({ user, onSignOut }) {
     }
   }, [user]);
 
+  // ユーザーのルーム一覧を取得
+  useEffect(() => {
+    const fetchUserRooms = async () => {
+      if (!currentUser?.userId) return;
+
+      try {
+        console.log('Fetching rooms for user:', currentUser.userId);
+        const result = await client.graphql({
+          query: GET_USER_ROOMS,
+          variables: { 
+            userId: currentUser.userId,
+            limit: 50 
+          },
+          authMode: 'apiKey'
+        });
+
+        if (result.data.getUserRooms?.items) {
+          console.log('User rooms:', result.data.getUserRooms.items);
+          setUserRooms(result.data.getUserRooms.items);
+        }
+      } catch (error) {
+        console.error('Error fetching user rooms:', error);
+      }
+    };
+
+    if (currentUser?.userId) {
+      fetchUserRooms();
+    }
+  }, [currentUser]);
+
+  // 全ユーザーリストを取得（ダイレクトメッセージ用）
+  useEffect(() => {
+    const fetchAllUsers = async () => {
+      try {
+        const result = await client.graphql({
+          query: LIST_ALL_USERS,
+          variables: { limit: 50 },
+          authMode: 'apiKey'
+        });
+
+        if (result.data.listUsers?.items) {
+          // 現在のユーザーを除外
+          const otherUsers = result.data.listUsers.items.filter(
+            u => u.userId !== currentUser?.userId
+          );
+          console.log('All users:', otherUsers);
+          setAllUsers(otherUsers);
+        }
+      } catch (error) {
+        console.error('Error fetching users:', error);
+      }
+    };
+
+    if (currentUser?.userId) {
+      fetchAllUsers();
+    }
+  }, [currentUser]);
+
+  // グループルーム作成
+  const createGroupRoom = async () => {
+    if (!newRoomName.trim() || !currentUser?.userId) return;
+
+    try {
+      console.log('Creating room:', newRoomName, selectedUsers);
+      const result = await client.graphql({
+        query: CREATE_GROUP_ROOM,
+        variables: {
+          input: {
+            roomName: newRoomName.trim(),
+            memberUserIds: selectedUsers,
+            createdBy: currentUser.userId
+          }
+        },
+        authMode: 'apiKey'
+      });
+
+      if (result.data.createGroupRoom) {
+        console.log('Room created:', result.data.createGroupRoom);
+        // ルーム一覧を更新
+        const newRoom = {
+          ...result.data.createGroupRoom,
+          lastMessage: "未入力",
+          lastMessageAt: result.data.createGroupRoom.createdAt
+        };
+        setUserRooms(prev => [newRoom, ...prev]);
+        
+        // フォームをリセット
+        setNewRoomName("");
+        setSelectedUsers([]);
+        setIsCreatingRoom(false);
+      }
+    } catch (error) {
+      console.error('Error creating room:', error);
+      alert('ルーム作成でエラーが発生しました: ' + error.message);
+    }
+  };
+
+  // ダイレクトルーム作成
+  const createDirectRoom = async (targetUserId) => {
+    if (!currentUser?.userId || !targetUserId) return;
+
+    try {
+      console.log('Creating direct room with:', targetUserId);
+      const result = await client.graphql({
+        query: CREATE_DIRECT_ROOM,
+        variables: {
+          targetUserId: targetUserId,
+          createdBy: currentUser.userId
+        },
+        authMode: 'apiKey'
+      });
+
+      if (result.data.createDirectRoom) {
+        console.log('Direct room created:', result.data.createDirectRoom);
+        // ルーム一覧を更新
+        const newRoom = {
+          ...result.data.createDirectRoom,
+          lastMessage: "未入力",
+          lastMessageAt: result.data.createDirectRoom.createdAt
+        };
+        setUserRooms(prev => [newRoom, ...prev]);
+      }
+    } catch (error) {
+      console.error('Error creating direct room:', error);
+      alert('ダイレクトルーム作成でエラーが発生しました: ' + error.message);
+    }
+  };
+
   const sendMessage = () => {
     if (newMessage.trim()) {
       const displayName = currentUser?.nickname || user.profile.name || user.profile.email.split('@')[0];
@@ -199,6 +378,19 @@ function ChatScreen({ user, onSignOut }) {
     return name.substring(0, 2).toUpperCase();
   };
 
+  // ユーザー選択のトグル
+  const toggleUserSelection = (userId) => {
+    setSelectedUsers(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  // グループルームとダイレクトルームの分類
+  const groupRooms = userRooms.filter(room => room.roomType === 'group');
+  const directRooms = userRooms.filter(room => room.roomType === 'direct');
+
   return (
     <div className="chat-app">
       {/* サイドバー */}
@@ -216,34 +408,135 @@ function ChatScreen({ user, onSignOut }) {
 
         {/* 新しいチャット */}
         <div className="new-chat-section">
-          <button className="new-chat-btn">
+          <button className="new-chat-btn" onClick={() => setIsCreatingRoom(true)}>
             <span className="plus-icon">+</span>
             新しいチャット
           </button>
         </div>
 
+        {/* ルーム作成モーダル */}
+        {isCreatingRoom && (
+          <div className="modal-overlay">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h3>新しいグループルームを作成</h3>
+                <button onClick={() => setIsCreatingRoom(false)}>×</button>
+              </div>
+              <div className="modal-body">
+                <input
+                  type="text"
+                  placeholder="ルーム名"
+                  value={newRoomName}
+                  onChange={(e) => setNewRoomName(e.target.value)}
+                  className="room-name-input"
+                />
+                <div className="user-selection">
+                  <h4>メンバーを選択:</h4>
+                  {allUsers.map(user => (
+                    <div key={user.userId} className="user-checkbox">
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={selectedUsers.includes(user.userId)}
+                          onChange={() => toggleUserSelection(user.userId)}
+                        />
+                        <span>{user.nickname || user.email}</span>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button onClick={() => setIsCreatingRoom(false)}>キャンセル</button>
+                <button onClick={createGroupRoom} disabled={!newRoomName.trim()}>
+                  作成
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ナビゲーション */}
         <div className="nav-section">
+          {/* ホーム */}
           <div className="nav-group">
             <div className="nav-group-header">ショートカット</div>
-            {spaces.map((space) => (
+            <div 
+              className={`nav-item ${selectedSpace === "ホーム" ? 'active' : ''}`}
+              onClick={() => setSelectedSpace("ホーム")}
+            >
+              <span className="nav-icon icon-home"></span>
+              <span className="nav-text">ホーム</span>
+            </div>
+            
+            {/* グループルーム */}
+            {groupRooms.map((room) => (
               <div 
-                key={space.name}
-                className={`nav-item ${selectedSpace === space.name ? 'active' : ''}`}
-                onClick={() => setSelectedSpace(space.name)}
+                key={room.roomId}
+                className={`nav-item ${selectedSpace === room.roomName ? 'active' : ''}`}
+                onClick={() => setSelectedSpace(room.roomName)}
               >
-                <span className={`nav-icon icon-${space.icon}`}></span>
-                <span className="nav-text">{space.name}</span>
+                <span className="nav-icon icon-team"></span>
+                <span className="nav-text">{room.roomName}</span>
+                <span className="member-count">({room.memberCount})</span>
               </div>
             ))}
           </div>
 
+          {/* ダイレクトメッセージ */}
           <div className="nav-group">
             <div className="nav-group-header">ダイレクト メッセージ</div>
-            {recentChats.map((chat) => (
-              <div key={chat.name} className="nav-item dm-item">
-                <span className="nav-icon user-avatar">{chat.avatar}</span>
-                <span className="nav-text">{chat.name}</span>
+            
+            {/* 既存のダイレクトルーム */}
+            {directRooms.map((room) => {
+              const formatTime = (timestamp) => {
+                if (!timestamp) return '';
+                const date = new Date(timestamp);
+                const now = new Date();
+                const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+                
+                if (diffDays === 0) {
+                  return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+                } else if (diffDays === 1) {
+                  return '昨日';
+                } else {
+                  return `${diffDays}日前`;
+                }
+              };
+
+              return (
+                <div 
+                  key={room.roomId} 
+                  className="nav-item dm-item"
+                  onClick={() => setSelectedSpace(room.roomName)}
+                >
+                  <span className="nav-icon user-avatar">
+                    {room.roomName.substring(0, 2).toUpperCase()}
+                  </span>
+                  <div className="dm-info">
+                    <span className="nav-text">{room.roomName}</span>
+                    <div className="dm-preview">
+                      <span className="last-message">{room.lastMessage || "未入力"}</span>
+                      <span className="last-time">{formatTime(room.lastMessageAt)}</span>
+                    </div>
+                  </div>
+                  <div className="status-indicator online"></div>
+                </div>
+              );
+            })}
+            
+            {/* 利用可能なユーザー（新しいダイレクトルーム作成用） */}
+            {allUsers.filter(u => !directRooms.some(room => room.roomName.includes(u.nickname || u.email))).map((user) => (
+              <div 
+                key={user.userId} 
+                className="nav-item dm-item clickable"
+                onClick={() => createDirectRoom(user.userId)}
+                title={`${user.nickname || user.email}とダイレクトメッセージを開始`}
+              >
+                <span className="nav-icon user-avatar">
+                  {(user.nickname || user.email).substring(0, 2).toUpperCase()}
+                </span>
+                <span className="nav-text">{user.nickname || user.email}</span>
                 <div className="status-indicator online"></div>
               </div>
             ))}
@@ -257,7 +550,10 @@ function ChatScreen({ user, onSignOut }) {
         <div className="chat-header">
           <div className="chat-info">
             <h2 className="chat-title">{selectedSpace}</h2>
-            <div className="chat-subtitle">3人のメンバー</div>
+            <div className="chat-subtitle">
+              {selectedSpace === "ホーム" ? "チャットルームを選択してください" : 
+               `${groupRooms.find(r => r.roomName === selectedSpace)?.memberCount || directRooms.find(r => r.roomName === selectedSpace)?.memberCount || 0}人のメンバー`}
+            </div>
           </div>
           <div className="chat-actions">
             <button className="action-btn">未読</button>
@@ -278,50 +574,73 @@ function ChatScreen({ user, onSignOut }) {
         {/* メッセージ一覧 */}
         <div className="messages-container">
           <div className="messages-list">
-            {messages.map((message) => (
-              <div 
-                key={message.id} 
-                className={`message-item ${message.isOwn ? 'own-message' : ''}`}
-              >
-                {!message.isOwn && (
-                  <div className="message-avatar user-avatar">{message.avatar}</div>
-                )}
-                <div className="message-content">
-                  <div className="message-header">
-                    <span className="sender-name">{message.sender}</span>
-                    <span className="message-time">{message.time}</span>
+            {selectedSpace === "ホーム" ? (
+              <div className="welcome-message">
+                <h3>チャットへようこそ！</h3>
+                <p>左側のルーム一覧からチャットルームを選択するか、新しいチャットを作成してください。</p>
+                <div className="stats">
+                  <div className="stat-item">
+                    <strong>{groupRooms.length}</strong>
+                    <span>グループルーム</span>
                   </div>
-                  <div className="message-text">{message.content}</div>
+                  <div className="stat-item">
+                    <strong>{directRooms.length}</strong>
+                    <span>ダイレクトメッセージ</span>
+                  </div>
+                  <div className="stat-item">
+                    <strong>{allUsers.length}</strong>
+                    <span>利用可能なユーザー</span>
+                  </div>
                 </div>
               </div>
-            ))}
+            ) : (
+              messages.map((message) => (
+                <div 
+                  key={message.id} 
+                  className={`message-item ${message.isOwn ? 'own-message' : ''}`}
+                >
+                  {!message.isOwn && (
+                    <div className="message-avatar user-avatar">{message.avatar}</div>
+                  )}
+                  <div className="message-content">
+                    <div className="message-header">
+                      <span className="sender-name">{message.sender}</span>
+                      <span className="message-time">{message.time}</span>
+                    </div>
+                    <div className="message-text">{message.content}</div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
         {/* メッセージ入力 */}
-        <div className="message-input-area">
-          <div className="input-container">
-            <button className="attach-btn" title="ファイル添付"></button>
-            <textarea
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder={`${selectedSpace}にメッセージを送信`}
-              className="message-input"
-              rows="1"
-            />
-            <div className="input-actions">
-              <button className="icon-btn emoji-btn" title="絵文字"></button>
-              <button 
-                onClick={sendMessage} 
-                className={`send-btn ${newMessage.trim() ? 'active' : ''}`}
-                disabled={!newMessage.trim()}
-                title="送信"
-              >
-              </button>
+        {selectedSpace !== "ホーム" && (
+          <div className="message-input-area">
+            <div className="input-container">
+              <button className="attach-btn" title="ファイル添付"></button>
+              <textarea
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder={`${selectedSpace}にメッセージを送信`}
+                className="message-input"
+                rows="1"
+              />
+              <div className="input-actions">
+                <button className="icon-btn emoji-btn" title="絵文字"></button>
+                <button 
+                  onClick={sendMessage} 
+                  className={`send-btn ${newMessage.trim() ? 'active' : ''}`}
+                  disabled={!newMessage.trim()}
+                  title="送信"
+                >
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
