@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { generateClient } from "aws-amplify/api";
-import { getUser, getUserRooms, searchUsers } from "../graphql/queries";
 import { createGroupRoom, createDirectRoom } from "../graphql/mutations";
+
+import useAuthUser from "../hooks/useAuthUser";
+import useUserRooms from "../hooks/useUserRooms";
 
 import Sidebar from "./Sidebar";
 import MessageList from "./MessageList";
@@ -12,69 +14,62 @@ import UserProfile from "./UserProfile";
 const client = generateClient();
 
 function ChatScreen({ user, onSignOut }) {
+  const currentUser = useAuthUser(user);
+  const userRooms = useUserRooms(currentUser);
+
   const [selectedSpace, setSelectedSpace] = useState("ホーム");
-  const [currentUser, setCurrentUser] = useState(null);
-  const [userRooms, setUserRooms] = useState([]);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
 
-  // ユーザー情報の取得
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      try {
-        const oidcSub = user.profile.sub;
-        const result = await client.graphql({
-          query: getUser,
-          variables: { userId: oidcSub },
-          authMode: "apiKey",
-        });
-        setCurrentUser(result.data.getUser || {
-          userId: oidcSub,
-          nickname: user.profile.name || user.profile.preferred_username,
-          email: user.profile.email,
-          status: "active"
-        });
-      } catch (err) {
-        console.error("Error fetching user:", err);
-      }
-    };
-    if (user?.profile?.sub) fetchCurrentUser();
-  }, [user]);
+  // グループルームとDMに分割
+  const groupRooms = userRooms.filter((room) => room.roomType === "group");
+  const directRooms = userRooms.filter((room) => room.roomType === "direct");
 
-  // ルーム一覧の取得
-  useEffect(() => {
-    const fetchRooms = async () => {
-      if (!currentUser?.userId) return;
-      const result = await client.graphql({
-        query: getUserRooms,
-        variables: { userId: currentUser.userId, limit: 50 },
-        authMode: "apiKey",
-      });
-      setUserRooms(result.data.getUserRooms.items);
-    };
-    fetchRooms();
-  }, [currentUser]);
-
+  // メッセージ送信（ローカルのみ）
   const sendMessage = () => {
     if (!newMessage.trim()) return;
-    const displayName = currentUser?.nickname || user.profile.name;
-    setMessages([...messages, {
+
+    const displayName =
+      currentUser?.nickname || user.profile.name || user.profile.email;
+
+    const newMsg = {
       id: messages.length + 1,
       sender: displayName,
       content: newMessage,
-      time: new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }),
+      time: new Date().toLocaleTimeString("ja-JP", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
       isOwn: true,
-      avatar: displayName.substring(0, 2).toUpperCase()
-    }]);
+      avatar: displayName.substring(0, 2).toUpperCase(),
+    };
+
+    setMessages([...messages, newMsg]);
     setNewMessage("");
   };
 
-  const groupRooms = userRooms.filter(r => r.roomType === "group");
-  const directRooms = userRooms.filter(r => r.roomType === "direct");
+  // ダイレクトルーム作成（例: DM開始時）
+  const createDirectChat = async (targetUserId) => {
+    if (!currentUser?.userId) return;
+    try {
+      const result = await client.graphql({
+        query: createDirectRoom,
+        variables: {
+          targetUserId,
+          createdBy: currentUser.userId,
+        },
+        authMode: "userPool",
+      });
+      console.log("Direct room created:", result.data.createDirectRoom);
+    } catch (err) {
+      console.error("Error creating direct room:", err);
+    }
+  };
 
   return (
     <div className="chat-app">
+      {/* サイドバー */}
       <Sidebar
         selectedSpace={selectedSpace}
         setSelectedSpace={setSelectedSpace}
@@ -84,20 +79,28 @@ function ChatScreen({ user, onSignOut }) {
         onCreateRoom={() => setIsCreatingRoom(true)}
       />
 
+      {/* メインコンテンツ */}
       <div className="main-content">
+        {/* チャットヘッダー */}
         <div className="chat-header">
           <div className="chat-info">
             <h2 className="chat-title">{selectedSpace}</h2>
             <div className="chat-subtitle">
               {selectedSpace === "ホーム"
                 ? "チャットルームを選択してください"
-                : `${groupRooms.find(r => r.roomName === selectedSpace)?.memberCount || 
-                   directRooms.find(r => r.roomName === selectedSpace)?.memberCount || 0}人のメンバー`}
+                : `${
+                    groupRooms.find((r) => r.roomName === selectedSpace)
+                      ?.memberCount ||
+                    directRooms.find((r) => r.roomName === selectedSpace)
+                      ?.memberCount ||
+                    0
+                  }人のメンバー`}
             </div>
           </div>
           <UserProfile currentUser={currentUser} />
         </div>
 
+        {/* メッセージ一覧 */}
         <MessageList
           selectedSpace={selectedSpace}
           groupRooms={groupRooms}
@@ -105,6 +108,7 @@ function ChatScreen({ user, onSignOut }) {
           messages={messages}
         />
 
+        {/* メッセージ入力 */}
         {selectedSpace !== "ホーム" && (
           <MessageInput
             newMessage={newMessage}
@@ -114,11 +118,11 @@ function ChatScreen({ user, onSignOut }) {
         )}
       </div>
 
+      {/* ルーム作成モーダル */}
       {isCreatingRoom && (
         <RoomModal
           onClose={() => setIsCreatingRoom(false)}
           currentUser={currentUser}
-          setUserRooms={setUserRooms}
         />
       )}
     </div>
