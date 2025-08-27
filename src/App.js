@@ -156,7 +156,7 @@ function ChatScreen({ user, onSignOut }) {
           result = await client.graphql({
             query: GET_USER,
             variables: { userId: oidcSub },
-            authMode: 'apikey'
+            authMode: 'apiKey'
           });
           
           if (result.data.getUser) {
@@ -174,7 +174,7 @@ function ChatScreen({ user, onSignOut }) {
             result = await client.graphql({
               query: GET_USER_BY_EMAIL,
               variables: { email: email },
-              authMode: 'apikey'
+              authMode: 'apiKey'
             });
             
             if (result.data.getUserByEmail) {
@@ -229,7 +229,7 @@ function ChatScreen({ user, onSignOut }) {
             userId: currentUser.userId,
             limit: 50 
           },
-          authMode: 'apikey'
+          authMode: 'apiKey'
         });
 
         if (result.data.getUserRooms?.items) {
@@ -262,7 +262,7 @@ function ChatScreen({ user, onSignOut }) {
           searchTerm: searchTerm.trim(),
           limit: 20 
         },
-        authMode: 'apikey'
+        authMode: 'apiKey'
       });
 
       if (result.data.searchUsers?.items) {
@@ -309,7 +309,7 @@ function ChatScreen({ user, onSignOut }) {
             createdBy: currentUser.userId
           }
         },
-        authMode: 'apikey'
+        authMode: 'apiKey'
       });
 
       if (result.data.createGroupRoom) {
@@ -347,7 +347,7 @@ function ChatScreen({ user, onSignOut }) {
           targetUserId: targetUserId,
           createdBy: currentUser.userId
         },
-        authMode: 'apikey'
+        authMode: 'userPool'
       });
 
       if (result.data.createDirectRoom) {
