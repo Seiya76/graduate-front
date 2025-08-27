@@ -86,16 +86,16 @@ const CREATE_DIRECT_ROOM = `
   }
 `;
 
-const LIST_ALL_USERS = `
-  query ListUsers($limit: Int, $nextToken: String) {
-    listUsers(limit: $limit, nextToken: $nextToken) {
+// ユーザー検索クエリ
+const SEARCH_USERS = `
+  query SearchUsers($searchTerm: String!, $limit: Int) {
+    searchUsers(searchTerm: $searchTerm, limit: $limit) {
       items {
         userId
         nickname
         email
         status
       }
-      nextToken
     }
   }
 `;
@@ -105,7 +105,9 @@ function ChatScreen({ user, onSignOut }) {
   const [selectedSpace, setSelectedSpace] = useState("ホーム");
   const [currentUser, setCurrentUser] = useState(null);
   const [userRooms, setUserRooms] = useState([]);
-  const [allUsers, setAllUsers] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [newRoomName, setNewRoomName] = useState("");
   const [selectedUsers, setSelectedUsers] = useState([]);
@@ -154,7 +156,7 @@ function ChatScreen({ user, onSignOut }) {
           result = await client.graphql({
             query: GET_USER,
             variables: { userId: oidcSub },
-            authMode: 'apiKey'
+            authMode: 'userPool'
           });
           
           if (result.data.getUser) {
@@ -172,7 +174,7 @@ function ChatScreen({ user, onSignOut }) {
             result = await client.graphql({
               query: GET_USER_BY_EMAIL,
               variables: { email: email },
-              authMode: 'apiKey'
+              authMode: 'userPool'
             });
             
             if (result.data.getUserByEmail) {
@@ -227,7 +229,7 @@ function ChatScreen({ user, onSignOut }) {
             userId: currentUser.userId,
             limit: 50 
           },
-          authMode: 'apiKey'
+          authMode: 'userPool'
         });
 
         if (result.data.getUserRooms?.items) {
@@ -244,33 +246,53 @@ function ChatScreen({ user, onSignOut }) {
     }
   }, [currentUser]);
 
-  // 全ユーザーリストを取得（ダイレクトメッセージ用）
-  useEffect(() => {
-    const fetchAllUsers = async () => {
-      try {
-        const result = await client.graphql({
-          query: LIST_ALL_USERS,
-          variables: { limit: 50 },
-          authMode: 'apiKey'
-        });
-
-        if (result.data.listUsers?.items) {
-          // 現在のユーザーを除外
-          const otherUsers = result.data.listUsers.items.filter(
-            u => u.userId !== currentUser?.userId
-          );
-          console.log('All users:', otherUsers);
-          setAllUsers(otherUsers);
-        }
-      } catch (error) {
-        console.error('Error fetching users:', error);
-      }
-    };
-
-    if (currentUser?.userId) {
-      fetchAllUsers();
+  // ユーザー検索機能
+  const searchUsers = async (searchTerm) => {
+    if (!searchTerm.trim()) {
+      setSearchResults([]);
+      return;
     }
-  }, [currentUser]);
+
+    setIsSearching(true);
+    try {
+      console.log('Searching users:', searchTerm);
+      const result = await client.graphql({
+        query: SEARCH_USERS,
+        variables: { 
+          searchTerm: searchTerm.trim(),
+          limit: 20 
+        },
+        authMode: 'userPool'
+      });
+
+      if (result.data.searchUsers?.items) {
+        // 現在のユーザーを除外
+        const filteredUsers = result.data.searchUsers.items.filter(
+          u => u.userId !== currentUser?.userId
+        );
+        console.log('Search results:', filteredUsers);
+        setSearchResults(filteredUsers);
+      }
+    } catch (error) {
+      console.error('Error searching users:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // 検索のデバウンス処理
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchTerm) {
+        searchUsers(searchTerm);
+      } else {
+        setSearchResults([]);
+      }
+    }, 500); // 500ms後に検索実行
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, currentUser]);
 
   // グループルーム作成
   const createGroupRoom = async () => {
@@ -287,7 +309,7 @@ function ChatScreen({ user, onSignOut }) {
             createdBy: currentUser.userId
           }
         },
-        authMode: 'apiKey'
+        authMode: 'userPool'
       });
 
       if (result.data.createGroupRoom) {
@@ -304,6 +326,8 @@ function ChatScreen({ user, onSignOut }) {
         setNewRoomName("");
         setSelectedUsers([]);
         setIsCreatingRoom(false);
+        setSearchTerm("");
+        setSearchResults([]);
       }
     } catch (error) {
       console.error('Error creating room:', error);
@@ -323,7 +347,7 @@ function ChatScreen({ user, onSignOut }) {
           targetUserId: targetUserId,
           createdBy: currentUser.userId
         },
-        authMode: 'apiKey'
+        authMode: 'userPool'
       });
 
       if (result.data.createDirectRoom) {
@@ -420,7 +444,13 @@ function ChatScreen({ user, onSignOut }) {
             <div className="modal-content">
               <div className="modal-header">
                 <h3>新しいグループルームを作成</h3>
-                <button onClick={() => setIsCreatingRoom(false)}>×</button>
+                <button onClick={() => {
+                  setIsCreatingRoom(false);
+                  setSearchTerm("");
+                  setSearchResults([]);
+                  setSelectedUsers([]);
+                  setNewRoomName("");
+                }}>×</button>
               </div>
               <div className="modal-body">
                 <input
@@ -430,26 +460,89 @@ function ChatScreen({ user, onSignOut }) {
                   onChange={(e) => setNewRoomName(e.target.value)}
                   className="room-name-input"
                 />
-                <div className="user-selection">
-                  <h4>メンバーを選択:</h4>
-                  {allUsers.map(user => (
-                    <div key={user.userId} className="user-checkbox">
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={selectedUsers.includes(user.userId)}
-                          onChange={() => toggleUserSelection(user.userId)}
-                        />
-                        <span>{user.nickname || user.email}</span>
-                      </label>
+                
+                {/* ユーザー検索 */}
+                <div className="user-search-section">
+                  <h4>メンバーを検索して追加:</h4>
+                  <div className="search-container">
+                    <input
+                      type="text"
+                      placeholder="名前またはメールアドレスで検索"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="user-search-input"
+                    />
+                    {isSearching && <div className="search-loading">検索中...</div>}
+                  </div>
+                  
+                  {/* 検索結果 */}
+                  {searchResults.length > 0 && (
+                    <div className="search-results">
+                      {searchResults.map(user => (
+                        <div key={user.userId} className="search-result-item">
+                          <div className="user-info">
+                            <div className="user-avatar-small">
+                              {(user.nickname || user.email).substring(0, 2).toUpperCase()}
+                            </div>
+                            <div className="user-details">
+                              <div className="user-name">{user.nickname || user.email}</div>
+                              <div className="user-email">{user.email}</div>
+                            </div>
+                          </div>
+                          <button
+                            className={`add-user-btn ${selectedUsers.includes(user.userId) ? 'selected' : ''}`}
+                            onClick={() => toggleUserSelection(user.userId)}
+                          >
+                            {selectedUsers.includes(user.userId) ? '削除' : '追加'}
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
+                  
+                  {searchTerm && searchResults.length === 0 && !isSearching && (
+                    <div className="no-results">該当するユーザーが見つかりませんでした</div>
+                  )}
                 </div>
+
+                {/* 選択されたユーザー一覧 */}
+                {selectedUsers.length > 0 && (
+                  <div className="selected-users-section">
+                    <h4>選択されたメンバー ({selectedUsers.length}人):</h4>
+                    <div className="selected-users-list">
+                      {selectedUsers.map(userId => {
+                        const user = searchResults.find(u => u.userId === userId);
+                        return user ? (
+                          <div key={userId} className="selected-user-item">
+                            <div className="user-avatar-small">
+                              {(user.nickname || user.email).substring(0, 2).toUpperCase()}
+                            </div>
+                            <span>{user.nickname || user.email}</span>
+                            <button
+                              className="remove-user-btn"
+                              onClick={() => toggleUserSelection(userId)}
+                            >×</button>
+                          </div>
+                        ) : null;
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="modal-footer">
-                <button onClick={() => setIsCreatingRoom(false)}>キャンセル</button>
-                <button onClick={createGroupRoom} disabled={!newRoomName.trim()}>
-                  作成
+                <button onClick={() => {
+                  setIsCreatingRoom(false);
+                  setSearchTerm("");
+                  setSearchResults([]);
+                  setSelectedUsers([]);
+                  setNewRoomName("");
+                }}>キャンセル</button>
+                <button 
+                  onClick={createGroupRoom} 
+                  disabled={!newRoomName.trim()}
+                  className="create-room-btn"
+                >
+                  作成 {selectedUsers.length > 0 && `(${selectedUsers.length + 1}人)`}
                 </button>
               </div>
             </div>
@@ -524,22 +617,44 @@ function ChatScreen({ user, onSignOut }) {
                 </div>
               );
             })}
-            
-            {/* 利用可能なユーザー（新しいダイレクトルーム作成用） */}
-            {allUsers.filter(u => !directRooms.some(room => room.roomName.includes(u.nickname || u.email))).map((user) => (
-              <div 
-                key={user.userId} 
-                className="nav-item dm-item clickable"
-                onClick={() => createDirectRoom(user.userId)}
-                title={`${user.nickname || user.email}とダイレクトメッセージを開始`}
-              >
-                <span className="nav-icon user-avatar">
-                  {(user.nickname || user.email).substring(0, 2).toUpperCase()}
-                </span>
-                <span className="nav-text">{user.nickname || user.email}</span>
-                <div className="status-indicator online"></div>
-              </div>
-            ))}
+
+            {/* ダイレクトメッセージ作成用検索 */}
+            <div className="dm-search-section">
+              <input
+                type="text"
+                placeholder="ユーザーを検索してDM開始"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="dm-search-input"
+              />
+              
+              {/* DM用検索結果 */}
+              {searchResults.length > 0 && searchTerm && (
+                <div className="dm-search-results">
+                  {searchResults.filter(user => 
+                    !directRooms.some(room => room.roomName.includes(user.nickname || user.email))
+                  ).map((user) => (
+                    <div 
+                      key={user.userId} 
+                      className="dm-search-result-item"
+                      onClick={() => {
+                        createDirectRoom(user.userId);
+                        setSearchTerm("");
+                        setSearchResults([]);
+                      }}
+                    >
+                      <span className="nav-icon user-avatar">
+                        {(user.nickname || user.email).substring(0, 2).toUpperCase()}
+                      </span>
+                      <div className="dm-user-info">
+                        <span className="dm-user-name">{user.nickname || user.email}</span>
+                        <span className="dm-user-email">{user.email}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -552,7 +667,7 @@ function ChatScreen({ user, onSignOut }) {
             <h2 className="chat-title">{selectedSpace}</h2>
             <div className="chat-subtitle">
               {selectedSpace === "ホーム" ? "チャットルームを選択してください" : 
-              `${groupRooms.find(r => r.roomName === selectedSpace)?.memberCount || directRooms.find(r => r.roomName === selectedSpace)?.memberCount || 0}人のメンバー`}
+               `${groupRooms.find(r => r.roomName === selectedSpace)?.memberCount || directRooms.find(r => r.roomName === selectedSpace)?.memberCount || 0}人のメンバー`}
             </div>
           </div>
           <div className="chat-actions">
@@ -588,8 +703,8 @@ function ChatScreen({ user, onSignOut }) {
                     <span>ダイレクトメッセージ</span>
                   </div>
                   <div className="stat-item">
-                    <strong>{allUsers.length}</strong>
-                    <span>利用可能なユーザー</span>
+                    <strong>{searchResults.length}</strong>
+                    <span>検索結果のユーザー</span>
                   </div>
                 </div>
               </div>
