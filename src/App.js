@@ -100,6 +100,17 @@ const SEARCH_USERS = `
   }
 `;
 
+const JOIN_ROOM = `
+  mutation JoinRoom($roomId: ID!, $userId: ID!) {
+    joinRoom(roomId: $roomId, userId: $userId) {
+      userId
+      roomId
+      joinedAt
+      role
+    }
+  }
+`;
+
 // Google Chat風のチャット画面コンポーネント
 function ChatScreen({ user, onSignOut }) {
   const [selectedSpace, setSelectedSpace] = useState("ホーム");
@@ -351,45 +362,71 @@ function ChatScreen({ user, onSignOut }) {
   }, [dmSearchTerm, currentUser]);
 
   // グループルーム作成
-  const createGroupRoom = async () => {
-    if (!newRoomName.trim() || !currentUser?.userId) return;
+const createGroupRoom = async () => {
+  if (!newRoomName.trim() || !currentUser?.userId) return;
 
-    try {
-      console.log('Creating room:', newRoomName, selectedUsers);
-      const result = await client.graphql({
-        query: CREATE_GROUP_ROOM,
-        variables: {
-          input: {
-            roomName: newRoomName.trim(),
-            memberUserIds: selectedUsers,
-            createdBy: currentUser.userId
-          }
-        },
-        authMode: 'apiKey'
-      });
+  try {
+    console.log('Creating room:', newRoomName, selectedUsers);
+    
+    // 1. ルーム作成
+    const result = await client.graphql({
+      query: CREATE_GROUP_ROOM,
+      variables: {
+        input: {
+          roomName: newRoomName.trim(),
+          memberUserIds: selectedUsers,
+          createdBy: currentUser.userId
+        }
+      },
+      authMode: 'apiKey'
+    });
 
-      if (result.data.createGroupRoom) {
-        console.log('Room created:', result.data.createGroupRoom);
-        // ルーム一覧を更新
-        const newRoom = {
-          ...result.data.createGroupRoom,
-          lastMessage: "未入力",
-          lastMessageAt: result.data.createGroupRoom.createdAt
-        };
-        setUserRooms(prev => [newRoom, ...prev]);
+    if (result.data.createGroupRoom) {
+      console.log('Room created:', result.data.createGroupRoom);
+      const createdRoom = result.data.createGroupRoom;
+      
+      // 2. 選択されたメンバーを順次追加
+      let addedMembersCount = 0;
+      if (selectedUsers.length > 0) {
+        console.log('Adding members to room:', selectedUsers);
         
-        // フォームをリセット
-        setNewRoomName("");
-        setSelectedUsers([]);
-        setIsCreatingRoom(false);
-        setModalSearchTerm("");
-        setModalSearchResults([]);
+        for (const userId of selectedUsers) {
+          try {
+            await client.graphql({
+              query: JOIN_ROOM,
+              variables: {
+                roomId: createdRoom.roomId,
+                userId: userId
+              },
+              authMode: 'apiKey'
+            });
+            addedMembersCount++;
+            console.log('Member added:', userId);
+          } catch (memberError) {
+            console.error('Error adding member:', userId, memberError);
+          }
+        }
       }
-    } catch (error) {
-      console.error('Error creating room:', error);
-      alert('ルーム作成でエラーが発生しました: ' + error.message);
+      
+      // 3. UIを更新
+      const newRoom = {
+        ...createdRoom,
+        lastMessage: "未入力",
+        lastMessageAt: createdRoom.createdAt
+      };
+      setUserRooms(prev => [newRoom, ...prev]);
+      
+      // 4. フォームをリセット
+      resetModal();
+      
+      // 5. 成功メッセージ
+      alert(`ルーム「${newRoomName}」を作成しました。${addedMembersCount}人のメンバーを追加しました。`);
     }
-  };
+  } catch (error) {
+    console.error('Error creating room:', error);
+    alert('ルーム作成でエラーが発生しました: ' + error.message);
+  }
+};
 
   // ダイレクトルーム作成
   const createDirectRoom = async (targetUserId) => {
@@ -403,7 +440,7 @@ function ChatScreen({ user, onSignOut }) {
           targetUserId: targetUserId,
           createdBy: currentUser.userId
         },
-        authMode: 'apikey'
+        authMode: 'apiKey'
       });
 
       if (result.data.createDirectRoom) {
