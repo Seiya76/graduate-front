@@ -105,9 +105,17 @@ function ChatScreen({ user, onSignOut }) {
   const [selectedSpace, setSelectedSpace] = useState("ホーム");
   const [currentUser, setCurrentUser] = useState(null);
   const [userRooms, setUserRooms] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
-  const [isSearching, setIsSearching] = useState(false);
+  
+  // ルーム作成モーダル用のstate
+  const [modalSearchTerm, setModalSearchTerm] = useState("");
+  const [modalSearchResults, setModalSearchResults] = useState([]);
+  const [isModalSearching, setIsModalSearching] = useState(false);
+  
+  // ダイレクトメッセージ用のstate
+  const [dmSearchTerm, setDmSearchTerm] = useState("");
+  const [dmSearchResults, setDmSearchResults] = useState([]);
+  const [isDmSearching, setIsDmSearching] = useState(false);
+  
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [newRoomName, setNewRoomName] = useState("");
   const [selectedUsers, setSelectedUsers] = useState([]);
@@ -246,16 +254,16 @@ function ChatScreen({ user, onSignOut }) {
     }
   }, [currentUser]);
 
-  // ユーザー検索機能
-  const searchUsers = async (searchTerm) => {
+  // モーダル用のユーザー検索機能
+  const searchUsersForModal = async (searchTerm) => {
     if (!searchTerm.trim()) {
-      setSearchResults([]);
+      setModalSearchResults([]);
       return;
     }
 
-    setIsSearching(true);
+    setIsModalSearching(true);
     try {
-      console.log('Searching users:', searchTerm);
+      console.log('Searching users for modal:', searchTerm);
       const result = await client.graphql({
         query: SEARCH_USERS,
         variables: { 
@@ -270,29 +278,77 @@ function ChatScreen({ user, onSignOut }) {
         const filteredUsers = result.data.searchUsers.items.filter(
           u => u.userId !== currentUser?.userId
         );
-        console.log('Search results:', filteredUsers);
-        setSearchResults(filteredUsers);
+        console.log('Modal search results:', filteredUsers);
+        setModalSearchResults(filteredUsers);
       }
     } catch (error) {
-      console.error('Error searching users:', error);
-      setSearchResults([]);
+      console.error('Error searching users for modal:', error);
+      setModalSearchResults([]);
     } finally {
-      setIsSearching(false);
+      setIsModalSearching(false);
     }
   };
 
-  // 検索のデバウンス処理
+  // DM用のユーザー検索機能
+  const searchUsersForDM = async (searchTerm) => {
+    if (!searchTerm.trim()) {
+      setDmSearchResults([]);
+      return;
+    }
+
+    setIsDmSearching(true);
+    try {
+      console.log('Searching users for DM:', searchTerm);
+      const result = await client.graphql({
+        query: SEARCH_USERS,
+        variables: { 
+          searchTerm: searchTerm.trim(),
+          limit: 20 
+        },
+        authMode: 'apiKey'
+      });
+
+      if (result.data.searchUsers?.items) {
+        // 現在のユーザーを除外
+        const filteredUsers = result.data.searchUsers.items.filter(
+          u => u.userId !== currentUser?.userId
+        );
+        console.log('DM search results:', filteredUsers);
+        setDmSearchResults(filteredUsers);
+      }
+    } catch (error) {
+      console.error('Error searching users for DM:', error);
+      setDmSearchResults([]);
+    } finally {
+      setIsDmSearching(false);
+    }
+  };
+
+  // モーダル検索のデバウンス処理
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (searchTerm) {
-        searchUsers(searchTerm);
+      if (modalSearchTerm) {
+        searchUsersForModal(modalSearchTerm);
       } else {
-        setSearchResults([]);
+        setModalSearchResults([]);
       }
     }, 500); // 500ms後に検索実行
 
     return () => clearTimeout(timer);
-  }, [searchTerm, currentUser]);
+  }, [modalSearchTerm, currentUser]);
+
+  // DM検索のデバウンス処理
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (dmSearchTerm) {
+        searchUsersForDM(dmSearchTerm);
+      } else {
+        setDmSearchResults([]);
+      }
+    }, 500); // 500ms後に検索実行
+
+    return () => clearTimeout(timer);
+  }, [dmSearchTerm, currentUser]);
 
   // グループルーム作成
   const createGroupRoom = async () => {
@@ -326,8 +382,8 @@ function ChatScreen({ user, onSignOut }) {
         setNewRoomName("");
         setSelectedUsers([]);
         setIsCreatingRoom(false);
-        setSearchTerm("");
-        setSearchResults([]);
+        setModalSearchTerm("");
+        setModalSearchResults([]);
       }
     } catch (error) {
       console.error('Error creating room:', error);
@@ -411,6 +467,15 @@ function ChatScreen({ user, onSignOut }) {
     );
   };
 
+  // モーダルリセット関数
+  const resetModal = () => {
+    setIsCreatingRoom(false);
+    setModalSearchTerm("");
+    setModalSearchResults([]);
+    setSelectedUsers([]);
+    setNewRoomName("");
+  };
+
   // グループルームとダイレクトルームの分類
   const groupRooms = userRooms.filter(room => room.roomType === 'group');
   const directRooms = userRooms.filter(room => room.roomType === 'direct');
@@ -444,13 +509,7 @@ function ChatScreen({ user, onSignOut }) {
             <div className="modal-content">
               <div className="modal-header">
                 <h3>新しいグループルームを作成</h3>
-                <button onClick={() => {
-                  setIsCreatingRoom(false);
-                  setSearchTerm("");
-                  setSearchResults([]);
-                  setSelectedUsers([]);
-                  setNewRoomName("");
-                }}>×</button>
+                <button onClick={resetModal}>×</button>
               </div>
               <div className="modal-body">
                 <input
@@ -468,17 +527,17 @@ function ChatScreen({ user, onSignOut }) {
                     <input
                       type="text"
                       placeholder="名前またはメールアドレスで検索"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      value={modalSearchTerm}
+                      onChange={(e) => setModalSearchTerm(e.target.value)}
                       className="user-search-input"
                     />
-                    {isSearching && <div className="search-loading">検索中...</div>}
+                    {isModalSearching && <div className="search-loading">検索中...</div>}
                   </div>
                   
                   {/* 検索結果 */}
-                  {searchResults.length > 0 && (
+                  {modalSearchResults.length > 0 && (
                     <div className="search-results">
-                      {searchResults.map(user => (
+                      {modalSearchResults.map(user => (
                         <div key={user.userId} className="search-result-item">
                           <div className="user-info">
                             <div className="user-avatar-small">
@@ -500,7 +559,7 @@ function ChatScreen({ user, onSignOut }) {
                     </div>
                   )}
                   
-                  {searchTerm && searchResults.length === 0 && !isSearching && (
+                  {modalSearchTerm && modalSearchResults.length === 0 && !isModalSearching && (
                     <div className="no-results">該当するユーザーが見つかりませんでした</div>
                   )}
                 </div>
@@ -511,7 +570,7 @@ function ChatScreen({ user, onSignOut }) {
                     <h4>選択されたメンバー ({selectedUsers.length}人):</h4>
                     <div className="selected-users-list">
                       {selectedUsers.map(userId => {
-                        const user = searchResults.find(u => u.userId === userId);
+                        const user = modalSearchResults.find(u => u.userId === userId);
                         return user ? (
                           <div key={userId} className="selected-user-item">
                             <div className="user-avatar-small">
@@ -530,13 +589,7 @@ function ChatScreen({ user, onSignOut }) {
                 )}
               </div>
               <div className="modal-footer">
-                <button onClick={() => {
-                  setIsCreatingRoom(false);
-                  setSearchTerm("");
-                  setSearchResults([]);
-                  setSelectedUsers([]);
-                  setNewRoomName("");
-                }}>キャンセル</button>
+                <button onClick={resetModal}>キャンセル</button>
                 <button 
                   onClick={createGroupRoom} 
                   disabled={!newRoomName.trim()}
@@ -623,15 +676,15 @@ function ChatScreen({ user, onSignOut }) {
               <input
                 type="text"
                 placeholder="ユーザーを検索してDM開始"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={dmSearchTerm}
+                onChange={(e) => setDmSearchTerm(e.target.value)}
                 className="dm-search-input"
               />
               
               {/* DM用検索結果 */}
-              {searchResults.length > 0 && searchTerm && (
+              {dmSearchResults.length > 0 && dmSearchTerm && (
                 <div className="dm-search-results">
-                  {searchResults.filter(user => 
+                  {dmSearchResults.filter(user => 
                     !directRooms.some(room => room.roomName.includes(user.nickname || user.email))
                   ).map((user) => (
                     <div 
@@ -639,8 +692,8 @@ function ChatScreen({ user, onSignOut }) {
                       className="dm-search-result-item"
                       onClick={() => {
                         createDirectRoom(user.userId);
-                        setSearchTerm("");
-                        setSearchResults([]);
+                        setDmSearchTerm("");
+                        setDmSearchResults([]);
                       }}
                     >
                       <span className="nav-icon user-avatar">
@@ -703,7 +756,7 @@ function ChatScreen({ user, onSignOut }) {
                     <span>ダイレクトメッセージ</span>
                   </div>
                   <div className="stat-item">
-                    <strong>{searchResults.length}</strong>
+                    <strong>{dmSearchResults.length}</strong>
                     <span>検索結果のユーザー</span>
                   </div>
                 </div>
