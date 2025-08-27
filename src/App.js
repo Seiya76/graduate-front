@@ -347,7 +347,7 @@ function ChatScreen({ user, onSignOut }) {
           targetUserId: targetUserId,
           createdBy: currentUser.userId
         },
-        authMode: 'userPool'
+        authMode: 'apikey'
       });
 
       if (result.data.createDirectRoom) {
