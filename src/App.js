@@ -552,7 +552,7 @@ function ChatScreen({ user, onSignOut }) {
             <h2 className="chat-title">{selectedSpace}</h2>
             <div className="chat-subtitle">
               {selectedSpace === "ホーム" ? "チャットルームを選択してください" : 
-               `${groupRooms.find(r => r.roomName === selectedSpace)?.memberCount || directRooms.find(r => r.roomName === selectedSpace)?.memberCount || 0}人のメンバー`}
+              `${groupRooms.find(r => r.roomName === selectedSpace)?.memberCount || directRooms.find(r => r.roomName === selectedSpace)?.memberCount || 0}人のメンバー`}
             </div>
           </div>
           <div className="chat-actions">
