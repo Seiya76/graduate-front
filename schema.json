@@ -84,7 +84,7 @@
           "deprecationReason" : null
         }, {
           "name" : "getUserRooms",
-          "description" : "  userIdを必須引数として追加",
+          "description" : null,
           "args" : [ {
             "name" : "userId",
             "description" : null,
@@ -484,7 +484,7 @@
         "description" : null,
         "fields" : [ {
           "name" : "createGroupRoom",
-          "description" : "  createdByを必須引数として追加",
+          "description" : null,
           "args" : [ {
             "name" : "input",
             "description" : null,
@@ -508,7 +508,7 @@
           "deprecationReason" : null
         }, {
           "name" : "createDirectRoom",
-          "description" : "  createdByを必須引数として追加",
+          "description" : null,
           "args" : [ {
             "name" : "targetUserId",
             "description" : null,
@@ -545,7 +545,7 @@
           "deprecationReason" : null
         }, {
           "name" : "joinRoom",
-          "description" : "  userIdを必須引数として追加",
+          "description" : null,
           "args" : [ {
             "name" : "roomId",
             "description" : null,
@@ -582,7 +582,7 @@
           "deprecationReason" : null
         }, {
           "name" : "leaveRoom",
-          "description" : "  userIdを必須引数として追加",
+          "description" : null,
           "args" : [ {
             "name" : "roomId",
             "description" : null,
@@ -1672,18 +1672,31 @@
         "onFragment" : false,
         "onField" : true
       }, {
-        "name" : "aws_iam",
-        "description" : "Tells the service this field/object has access authorized by sigv4 signing.",
+        "name" : "aws_api_key",
+        "description" : "Tells the service this field/object has access authorized by an API key.",
         "locations" : [ "OBJECT", "FIELD_DEFINITION" ],
         "args" : [ ],
         "onOperation" : false,
         "onFragment" : false,
         "onField" : false
       }, {
-        "name" : "aws_api_key",
-        "description" : "Tells the service this field/object has access authorized by an API key.",
+        "name" : "aws_cognito_user_pools",
+        "description" : "Tells the service this field/object has access authorized by a Cognito User Pools token.",
         "locations" : [ "OBJECT", "FIELD_DEFINITION" ],
-        "args" : [ ],
+        "args" : [ {
+          "name" : "cognito_groups",
+          "description" : "List of cognito user pool groups which have access on this field",
+          "type" : {
+            "kind" : "LIST",
+            "name" : null,
+            "ofType" : {
+              "kind" : "SCALAR",
+              "name" : "String",
+              "ofType" : null
+            }
+          },
+          "defaultValue" : null
+        } ],
         "onOperation" : false,
         "onFragment" : false,
         "onField" : false
@@ -1738,29 +1751,16 @@
         "onFragment" : false,
         "onField" : false
       }, {
-        "name" : "aws_cognito_user_pools",
-        "description" : "Tells the service this field/object has access authorized by a Cognito User Pools token.",
+        "name" : "aws_oidc",
+        "description" : "Tells the service this field/object has access authorized by an OIDC token.",
         "locations" : [ "OBJECT", "FIELD_DEFINITION" ],
-        "args" : [ {
-          "name" : "cognito_groups",
-          "description" : "List of cognito user pool groups which have access on this field",
-          "type" : {
-            "kind" : "LIST",
-            "name" : null,
-            "ofType" : {
-              "kind" : "SCALAR",
-              "name" : "String",
-              "ofType" : null
-            }
-          },
-          "defaultValue" : null
-        } ],
+        "args" : [ ],
         "onOperation" : false,
         "onFragment" : false,
         "onField" : false
       }, {
-        "name" : "aws_oidc",
-        "description" : "Tells the service this field/object has access authorized by an OIDC token.",
+        "name" : "aws_iam",
+        "description" : "Tells the service this field/object has access authorized by sigv4 signing.",
         "locations" : [ "OBJECT", "FIELD_DEFINITION" ],
         "args" : [ ],
         "onOperation" : false,

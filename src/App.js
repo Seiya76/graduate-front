@@ -100,17 +100,6 @@ const SEARCH_USERS = `
   }
 `;
 
-const JOIN_ROOM = `
-  mutation JoinRoom($roomId: ID!, $userId: ID!) {
-    joinRoom(roomId: $roomId, userId: $userId) {
-      userId
-      roomId
-      joinedAt
-      role
-    }
-  }
-`;
-
 // Google Chat風のチャット画面コンポーネント
 function ChatScreen({ user, onSignOut }) {
   const [selectedSpace, setSelectedSpace] = useState("ホーム");
@@ -128,6 +117,7 @@ function ChatScreen({ user, onSignOut }) {
   const [isDmSearching, setIsDmSearching] = useState(false);
   
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+  const [isRoomCreationLoading, setIsRoomCreationLoading] = useState(false);
   const [newRoomName, setNewRoomName] = useState("");
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [messages, setMessages] = useState([
@@ -265,7 +255,7 @@ function ChatScreen({ user, onSignOut }) {
     }
   }, [currentUser]);
 
-  // モーダル用のユーザー検索機能
+  // モーダル用のユーザー検索機能（改善版）
   const searchUsersForModal = async (searchTerm) => {
     if (!searchTerm.trim()) {
       setModalSearchResults([]);
@@ -279,16 +269,16 @@ function ChatScreen({ user, onSignOut }) {
         query: SEARCH_USERS,
         variables: { 
           searchTerm: searchTerm.trim(),
-          limit: 20 
+          limit: 50 // 検索結果数を増やす
         },
         authMode: 'apiKey'
       });
 
       if (result.data.searchUsers?.items) {
-        // 現在のユーザーを除外
-        const filteredUsers = result.data.searchUsers.items.filter(
-          u => u.userId !== currentUser?.userId
-        );
+        // 現在のユーザーを除外し、アクティブユーザーのみ表示
+        const filteredUsers = result.data.searchUsers.items
+          .filter(u => u.userId !== currentUser?.userId)
+          .filter(u => u.status === 'active' || !u.status); // アクティブまたは未設定
         console.log('Modal search results:', filteredUsers);
         setModalSearchResults(filteredUsers);
       }
@@ -361,72 +351,66 @@ function ChatScreen({ user, onSignOut }) {
     return () => clearTimeout(timer);
   }, [dmSearchTerm, currentUser]);
 
-  // グループルーム作成
-const createGroupRoom = async () => {
-  if (!newRoomName.trim() || !currentUser?.userId) return;
+  // グループルーム作成（改善版）
+  const createGroupRoom = async () => {
+    if (!newRoomName.trim() || !currentUser?.userId) return;
 
-  try {
-    console.log('Creating room:', newRoomName, selectedUsers);
-    
-    // 1. ルーム作成
-    const result = await client.graphql({
-      query: CREATE_GROUP_ROOM,
-      variables: {
-        input: {
-          roomName: newRoomName.trim(),
-          memberUserIds: selectedUsers,
-          createdBy: currentUser.userId
-        }
-      },
-      authMode: 'apiKey'
-    });
+    setIsRoomCreationLoading(true);
 
-    if (result.data.createGroupRoom) {
-      console.log('Room created:', result.data.createGroupRoom);
-      const createdRoom = result.data.createGroupRoom;
+    try {
+      console.log('Creating room:', newRoomName, selectedUsers);
       
-      // 2. 選択されたメンバーを順次追加
-      let addedMembersCount = 0;
-      if (selectedUsers.length > 0) {
-        console.log('Adding members to room:', selectedUsers);
-        
-        for (const userId of selectedUsers) {
-          try {
-            await client.graphql({
-              query: JOIN_ROOM,
-              variables: {
-                roomId: createdRoom.roomId,
-                userId: userId
-              },
-              authMode: 'apiKey'
-            });
-            addedMembersCount++;
-            console.log('Member added:', userId);
-          } catch (memberError) {
-            console.error('Error adding member:', userId, memberError);
+      // Lambda関数による一括メンバー追加でルーム作成
+      const result = await client.graphql({
+        query: CREATE_GROUP_ROOM,
+        variables: {
+          input: {
+            roomName: newRoomName.trim(),
+            memberUserIds: selectedUsers, // Lambda関数が一括処理
+            createdBy: currentUser.userId
           }
-        }
+        },
+        authMode: 'apiKey'
+      });
+
+      if (result.data.createGroupRoom) {
+        console.log('Room created successfully:', result.data.createGroupRoom);
+        const createdRoom = result.data.createGroupRoom;
+        
+        // UIを更新
+        const newRoom = {
+          ...createdRoom,
+          lastMessage: "未入力",
+          lastMessageAt: createdRoom.createdAt
+        };
+        setUserRooms(prev => [newRoom, ...prev]);
+        
+        // フォームをリセット
+        resetModal();
+        
+        // 成功メッセージ（実際のメンバー数を表示）
+        const totalMembers = createdRoom.memberCount;
+        alert(`ルーム「${newRoomName}」を作成しました。（${totalMembers}人のメンバー）`);
+        
+        // 作成したルームを選択
+        setSelectedSpace(createdRoom.roomName);
+      }
+    } catch (error) {
+      console.error('Error creating room:', error);
+      
+      // エラーの詳細を表示
+      let errorMessage = 'ルーム作成でエラーが発生しました。';
+      if (error.errors && error.errors.length > 0) {
+        errorMessage += '\n' + error.errors.map(e => e.message).join('\n');
+      } else if (error.message) {
+        errorMessage += '\n' + error.message;
       }
       
-      // 3. UIを更新
-      const newRoom = {
-        ...createdRoom,
-        lastMessage: "未入力",
-        lastMessageAt: createdRoom.createdAt
-      };
-      setUserRooms(prev => [newRoom, ...prev]);
-      
-      // 4. フォームをリセット
-      resetModal();
-      
-      // 5. 成功メッセージ
-      alert(`ルーム「${newRoomName}」を作成しました。${addedMembersCount}人のメンバーを追加しました。`);
+      alert(errorMessage);
+    } finally {
+      setIsRoomCreationLoading(false);
     }
-  } catch (error) {
-    console.error('Error creating room:', error);
-    alert('ルーム作成でエラーが発生しました: ' + error.message);
-  }
-};
+  };
 
   // ダイレクトルーム作成
   const createDirectRoom = async (targetUserId) => {
@@ -507,6 +491,7 @@ const createGroupRoom = async () => {
   // モーダルリセット関数
   const resetModal = () => {
     setIsCreatingRoom(false);
+    setIsRoomCreationLoading(false);
     setModalSearchTerm("");
     setModalSearchResults([]);
     setSelectedUsers([]);
@@ -540,13 +525,13 @@ const createGroupRoom = async () => {
           </button>
         </div>
 
-        {/* ルーム作成モーダル */}
+        {/* ルーム作成モーダル（改善版） */}
         {isCreatingRoom && (
           <div className="modal-overlay">
             <div className="modal-content">
               <div className="modal-header">
                 <h3>新しいグループルームを作成</h3>
-                <button onClick={resetModal}>×</button>
+                <button onClick={resetModal} disabled={isRoomCreationLoading}>×</button>
               </div>
               <div className="modal-body">
                 <input
@@ -555,9 +540,10 @@ const createGroupRoom = async () => {
                   value={newRoomName}
                   onChange={(e) => setNewRoomName(e.target.value)}
                   className="room-name-input"
+                  disabled={isRoomCreationLoading}
                 />
                 
-                {/* ユーザー検索 */}
+                {/* ユーザー検索セクション */}
                 <div className="user-search-section">
                   <h4>メンバーを検索して追加:</h4>
                   <div className="search-container">
@@ -567,13 +553,17 @@ const createGroupRoom = async () => {
                       value={modalSearchTerm}
                       onChange={(e) => setModalSearchTerm(e.target.value)}
                       className="user-search-input"
+                      disabled={isRoomCreationLoading}
                     />
                     {isModalSearching && <div className="search-loading">検索中...</div>}
                   </div>
                   
-                  {/* 検索結果 */}
+                  {/* 検索結果表示 */}
                   {modalSearchResults.length > 0 && (
                     <div className="search-results">
+                      <div className="search-results-header">
+                        {modalSearchResults.length}件のユーザーが見つかりました
+                      </div>
                       {modalSearchResults.map(user => (
                         <div key={user.userId} className="search-result-item">
                           <div className="user-info">
@@ -583,56 +573,93 @@ const createGroupRoom = async () => {
                             <div className="user-details">
                               <div className="user-name">{user.nickname || user.email}</div>
                               <div className="user-email">{user.email}</div>
+                              {user.status && (
+                                <div className="user-status">{user.status}</div>
+                              )}
                             </div>
                           </div>
                           <button
                             className={`add-user-btn ${selectedUsers.includes(user.userId) ? 'selected' : ''}`}
                             onClick={() => toggleUserSelection(user.userId)}
+                            disabled={isRoomCreationLoading}
                           >
-                            {selectedUsers.includes(user.userId) ? '削除' : '追加'}
+                            {selectedUsers.includes(user.userId) ? '✓ 選択済み' : '+ 追加'}
                           </button>
                         </div>
                       ))}
                     </div>
                   )}
                   
+                  {/* 検索結果なしの場合 */}
                   {modalSearchTerm && modalSearchResults.length === 0 && !isModalSearching && (
-                    <div className="no-results">該当するユーザーが見つかりませんでした</div>
+                    <div className="no-results">
+                      「{modalSearchTerm}」に該当するユーザーが見つかりませんでした
+                    </div>
                   )}
                 </div>
 
-                {/* 選択されたユーザー一覧 */}
+                {/* 選択されたメンバーのプレビュー */}
                 {selectedUsers.length > 0 && (
                   <div className="selected-users-section">
                     <h4>選択されたメンバー ({selectedUsers.length}人):</h4>
-                    <div className="selected-users-list">
-                      {selectedUsers.map(userId => {
-                        const user = modalSearchResults.find(u => u.userId === userId);
-                        return user ? (
-                          <div key={userId} className="selected-user-item">
-                            <div className="user-avatar-small">
-                              {(user.nickname || user.email).substring(0, 2).toUpperCase()}
+                    <div className="selected-users-preview">
+                      <div className="member-count-preview">
+                        総メンバー数: {selectedUsers.length + 1}人 (あなた + {selectedUsers.length}人)
+                      </div>
+                      <div className="selected-users-list">
+                        {selectedUsers.map(userId => {
+                          const user = modalSearchResults.find(u => u.userId === userId);
+                          return user ? (
+                            <div key={userId} className="selected-user-item">
+                              <div className="user-avatar-small">
+                                {(user.nickname || user.email).substring(0, 2).toUpperCase()}
+                              </div>
+                              <span className="selected-user-name">
+                                {user.nickname || user.email}
+                              </span>
+                              <button
+                                className="remove-user-btn"
+                                onClick={() => toggleUserSelection(userId)}
+                                disabled={isRoomCreationLoading}
+                                title="削除"
+                              >×</button>
                             </div>
-                            <span>{user.nickname || user.email}</span>
-                            <button
-                              className="remove-user-btn"
-                              onClick={() => toggleUserSelection(userId)}
-                            >×</button>
-                          </div>
-                        ) : null;
-                      })}
+                          ) : null;
+                        })}
+                      </div>
                     </div>
                   </div>
                 )}
               </div>
+              
               <div className="modal-footer">
-                <button onClick={resetModal}>キャンセル</button>
+                <button 
+                  onClick={resetModal}
+                  disabled={isRoomCreationLoading}
+                  className="cancel-btn"
+                >
+                  キャンセル
+                </button>
                 <button 
                   onClick={createGroupRoom} 
-                  disabled={!newRoomName.trim()}
+                  disabled={!newRoomName.trim() || isRoomCreationLoading}
                   className="create-room-btn"
                 >
-                  作成 {selectedUsers.length > 0 && `(${selectedUsers.length + 1}人)`}
+                  {isRoomCreationLoading ? (
+                    <>
+                      <span className="loading-spinner-small"></span>
+                      作成中...
+                    </>
+                  ) : (
+                    <>
+                      ルーム作成 
+                      {selectedUsers.length > 0 && (
+                        <span className="member-count-badge">
+                          {selectedUsers.length + 1}人
+                        </span>
+                      )}
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -793,7 +820,7 @@ const createGroupRoom = async () => {
                     <span>ダイレクトメッセージ</span>
                   </div>
                   <div className="stat-item">
-                    <strong>{dmSearchResults.length}</strong>
+                    <strong>{modalSearchResults.length}</strong>
                     <span>検索結果のユーザー</span>
                   </div>
                 </div>

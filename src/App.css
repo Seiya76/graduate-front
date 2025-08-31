@@ -1031,3 +1031,397 @@ body {
     font-size: 10px;
   }
 }
+/* モーダル改善用の追加CSS */
+
+/* 検索結果ヘッダー */
+.search-results-header {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  border-left: 3px solid #1a73e8;
+}
+
+/* ユーザー状態表示 */
+.user-status {
+  font-size: 12px;
+  color: #888;
+  font-style: italic;
+  margin-top: 2px;
+}
+
+/* 選択済みボタンのスタイル */
+.add-user-btn {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.add-user-btn:hover {
+  background-color: #f5f5f5;
+  border-color: #1a73e8;
+}
+
+.add-user-btn.selected {
+  background-color: #1a73e8;
+  color: white;
+  border-color: #1a73e8;
+}
+
+.add-user-btn:disabled {
+  background-color: #f5f5f5;
+  color: #ccc;
+  cursor: not-allowed;
+  border-color: #ddd;
+}
+
+/* 選択済みユーザープレビューエリア */
+.selected-users-preview {
+  background-color: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 12px;
+}
+
+.member-count-preview {
+  font-size: 14px;
+  color: #1a73e8;
+  font-weight: 600;
+  margin-bottom: 12px;
+  text-align: center;
+  background-color: #e8f0fe;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #dadce0;
+}
+
+/* 選択済みユーザーリスト */
+.selected-users-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border-radius: 4px;
+}
+
+.selected-user-item {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  background-color: white;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  transition: all 0.2s ease;
+}
+
+.selected-user-item:hover {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+
+.selected-user-name {
+  flex: 1;
+  margin-left: 12px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 削除ボタン */
+.remove-user-btn {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 18px;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.remove-user-btn:hover {
+  background-color: #ffebee;
+  color: #d32f2f;
+  transform: scale(1.1);
+}
+
+.remove-user-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* メンバー数バッジ */
+.member-count-badge {
+  background-color: #1a73e8;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 12px;
+  margin-left: 8px;
+  min-width: 20px;
+  text-align: center;
+}
+
+/* ローディングスピナー（小） */
+.loading-spinner-small {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #1a73e8;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 8px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ボタンの無効化スタイル */
+.create-room-btn:disabled,
+.cancel-btn:disabled {
+  background-color: #f5f5f5;
+  color: #ccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.create-room-btn {
+  background-color: #1a73e8;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.create-room-btn:hover:not(:disabled) {
+  background-color: #1557b0;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.cancel-btn {
+  background-color: #fff;
+  color: #666;
+  border: 1px solid #ddd;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  margin-right: 12px;
+  transition: all 0.2s ease;
+}
+
+.cancel-btn:hover:not(:disabled) {
+  background-color: #f5f5f5;
+  border-color: #999;
+}
+
+/* 検索結果なしのスタイル */
+.no-results {
+  text-align: center;
+  padding: 24px 16px;
+  color: #666;
+  font-style: italic;
+  background-color: #f9f9f9;
+  border-radius: 6px;
+  border: 1px dashed #ddd;
+  margin-top: 12px;
+}
+
+/* 検索結果のホバーエフェクト */
+.search-result-item {
+  transition: all 0.2s ease;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+
+.search-result-item:hover {
+  background-color: #f8f9fa;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* 検索コンテナのスタイル改善 */
+.search-container {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.user-search-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.user-search-input:focus {
+  outline: none;
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
+}
+
+.user-search-input:disabled {
+  background-color: #f5f5f5;
+  color: #ccc;
+  cursor: not-allowed;
+}
+
+/* 検索ローディング */
+.search-loading {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+}
+
+/* 検索結果コンテナ */
+.search-results {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background-color: #fff;
+  margin-top: 8px;
+}
+
+/* ユーザー情報の詳細表示 */
+.user-details {
+  flex: 1;
+  margin-left: 12px;
+}
+
+.user-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 2px;
+}
+
+.user-email {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 2px;
+}
+
+/* ユーザーアバターの改善 */
+.user-avatar-small {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: #1a73e8;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* モーダルフッターの改善 */
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 16px 24px;
+  background-color: #f8f9fa;
+  border-top: 1px solid #e0e0e0;
+  border-radius: 0 0 8px 8px;
+}
+
+/* ルーム名入力の改善 */
+.room-name-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 20px;
+  transition: all 0.2s ease;
+}
+
+.room-name-input:focus {
+  outline: none;
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
+}
+
+.room-name-input:disabled {
+  background-color: #f5f5f5;
+  color: #ccc;
+  cursor: not-allowed;
+}
+
+/* ユーザー検索セクションの改善 */
+.user-search-section {
+  margin-top: 16px;
+}
+
+.user-search-section h4 {
+  margin-bottom: 12px;
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* 選択されたユーザーセクション */
+.selected-users-section {
+  margin-top: 20px;
+}
+
+.selected-users-section h4 {
+  margin-bottom: 12px;
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+  .modal-content {
+    margin: 20px;
+    max-height: calc(100vh - 40px);
+  }
+  
+  .selected-users-list {
+    max-height: 150px;
+  }
+  
+  .search-results {
+    max-height: 200px;
+  }
+  
+  .member-count-badge {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+}
