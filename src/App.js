@@ -255,75 +255,118 @@ function ChatScreen({ user, onSignOut }) {
     }
   }, [currentUser]);
 
-  // モーダル用のユーザー検索機能（改善版）
-  const searchUsersForModal = async (searchTerm) => {
-    if (!searchTerm.trim()) {
-      setModalSearchResults([]);
-      return;
+// 修正版: ユーザーフィルタリング処理
+const searchUsersForModal = async (searchTerm) => {
+  if (!searchTerm.trim()) {
+    setModalSearchResults([]);
+    return;
+  }
+
+  setIsModalSearching(true);
+  try {
+    console.log('Searching users for modal:', searchTerm);
+    const result = await client.graphql({
+      query: SEARCH_USERS,
+      variables: { 
+        searchTerm: searchTerm.trim(),
+        limit: 50
+      },
+      authMode: 'apiKey'
+    });
+
+    if (result.data.searchUsers?.items) {
+      // 現在のユーザーを除外するのみ（statusフィルタリングを削除）
+      const filteredUsers = result.data.searchUsers.items
+        .filter(u => u.userId !== currentUser?.userId);
+        // .filter(u => u.status === 'active' || !u.status); ← この行を削除
+        
+      console.log('Modal search results:', filteredUsers);
+      setModalSearchResults(filteredUsers);
     }
+  } catch (error) {
+    console.error('Error searching users for modal:', error);
+    setModalSearchResults([]);
+  } finally {
+    setIsModalSearching(false);
+  }
+};
 
-    setIsModalSearching(true);
-    try {
-      console.log('Searching users for modal:', searchTerm);
-      const result = await client.graphql({
-        query: SEARCH_USERS,
-        variables: { 
-          searchTerm: searchTerm.trim(),
-          limit: 50 // 検索結果数を増やす
-        },
-        authMode: 'apiKey'
-      });
+// DM用検索も同様に修正
+const searchUsersForDM = async (searchTerm) => {
+  if (!searchTerm.trim()) {
+    setDmSearchResults([]);
+    return;
+  }
 
-      if (result.data.searchUsers?.items) {
-        // 現在のユーザーを除外し、アクティブユーザーのみ表示
-        const filteredUsers = result.data.searchUsers.items
-          .filter(u => u.userId !== currentUser?.userId)
-          .filter(u => u.status === 'active' || !u.status); // アクティブまたは未設定
-        console.log('Modal search results:', filteredUsers);
-        setModalSearchResults(filteredUsers);
-      }
-    } catch (error) {
-      console.error('Error searching users for modal:', error);
-      setModalSearchResults([]);
-    } finally {
-      setIsModalSearching(false);
+  setIsDmSearching(true);
+  try {
+    console.log('Searching users for DM:', searchTerm);
+    const result = await client.graphql({
+      query: SEARCH_USERS,
+      variables: { 
+        searchTerm: searchTerm.trim(),
+        limit: 20 
+      },
+      authMode: 'apiKey'
+    });
+
+    if (result.data.searchUsers?.items) {
+      // 現在のユーザーを除外するのみ
+      const filteredUsers = result.data.searchUsers.items.filter(
+        u => u.userId !== currentUser?.userId
+      );
+      console.log('DM search results:', filteredUsers);
+      setDmSearchResults(filteredUsers);
     }
-  };
+  } catch (error) {
+    console.error('Error searching users for DM:', error);
+    setDmSearchResults([]);
+  } finally {
+    setIsDmSearching(false);
+  }
+};
 
-  // DM用のユーザー検索機能
-  const searchUsersForDM = async (searchTerm) => {
-    if (!searchTerm.trim()) {
-      setDmSearchResults([]);
-      return;
+// より柔軟なstatusフィルタリングが必要な場合
+const searchUsersForModalWithStatus = async (searchTerm) => {
+  if (!searchTerm.trim()) {
+    setModalSearchResults([]);
+    return;
+  }
+
+  setIsModalSearching(true);
+  try {
+    const result = await client.graphql({
+      query: SEARCH_USERS,
+      variables: { 
+        searchTerm: searchTerm.trim(),
+        limit: 50
+      },
+      authMode: 'apiKey'
+    });
+
+    if (result.data.searchUsers?.items) {
+      const filteredUsers = result.data.searchUsers.items
+        .filter(u => u.userId !== currentUser?.userId)
+        .filter(u => {
+          // より柔軟なstatusフィルタリング
+          const status = u.status?.toLowerCase();
+          return !status || // statusがnullまたは未定義
+                 status === 'active' ||
+                 status === 'confirmed' ||
+                 status === 'online';
+          // 'inactive', 'blocked', 'deleted' などは除外
+        });
+        
+      console.log('Filtered users:', filteredUsers);
+      setModalSearchResults(filteredUsers);
     }
-
-    setIsDmSearching(true);
-    try {
-      console.log('Searching users for DM:', searchTerm);
-      const result = await client.graphql({
-        query: SEARCH_USERS,
-        variables: { 
-          searchTerm: searchTerm.trim(),
-          limit: 20 
-        },
-        authMode: 'apiKey'
-      });
-
-      if (result.data.searchUsers?.items) {
-        // 現在のユーザーを除外
-        const filteredUsers = result.data.searchUsers.items.filter(
-          u => u.userId !== currentUser?.userId
-        );
-        console.log('DM search results:', filteredUsers);
-        setDmSearchResults(filteredUsers);
-      }
-    } catch (error) {
-      console.error('Error searching users for DM:', error);
-      setDmSearchResults([]);
-    } finally {
-      setIsDmSearching(false);
-    }
-  };
+  } catch (error) {
+    console.error('Error searching users:', error);
+    setModalSearchResults([]);
+  } finally {
+    setIsModalSearching(false);
+  }
+};
 
   // モーダル検索のデバウンス処理
   useEffect(() => {
