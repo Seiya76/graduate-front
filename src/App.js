@@ -100,9 +100,6 @@ function ChatScreen({ user, onSignOut }) {
         const oidcSub = user.profile.sub;
         const email = user.profile.email;
         
-        console.log('OIDC sub:', oidcSub);
-        console.log('OIDC email:', email);
-        
         let result = null;
         
         // まずuserIdで検索を試す
@@ -114,12 +111,11 @@ function ChatScreen({ user, onSignOut }) {
           });
           
           if (result.data.getUser) {
-            console.log('User found by userId:', result.data.getUser);
             setCurrentUser(result.data.getUser);
             return;
           }
         } catch (userIdError) {
-          console.log('User not found by userId, trying email...');
+          // ユーザーが見つからない場合は次のステップへ
         }
         
         // userIdで見つからない場合、emailで検索
@@ -132,17 +128,15 @@ function ChatScreen({ user, onSignOut }) {
             });
             
             if (result.data.getUserByEmail) {
-              console.log('User found by email:', result.data.getUserByEmail);
               setCurrentUser(result.data.getUserByEmail);
               return;
             }
           } catch (emailError) {
-            console.log('User not found by email either');
+            // emailでも見つからない場合は次のステップへ
           }
         }
         
         // DynamoDBにデータがない場合はOIDC情報をフォールバック
-        console.log('Using OIDC profile as fallback');
         const fallbackUser = {
           userId: oidcSub,
           nickname: user.profile.name || user.profile.preferred_username,
@@ -152,8 +146,6 @@ function ChatScreen({ user, onSignOut }) {
         setCurrentUser(fallbackUser);
         
       } catch (error) {
-        console.error('Error fetching current user:', error);
-        
         // エラーの場合もOIDC情報をフォールバック
         const fallbackUser = {
           userId: user.profile.sub,
@@ -176,7 +168,6 @@ function ChatScreen({ user, onSignOut }) {
       if (!currentUser?.userId) return;
 
       try {
-        console.log('Fetching rooms for user:', currentUser.userId);
         const result = await client.graphql({
           query: getUserRooms,
           variables: { 
@@ -187,11 +178,10 @@ function ChatScreen({ user, onSignOut }) {
         });
 
         if (result.data.getUserRooms?.items) {
-          console.log('User rooms:', result.data.getUserRooms.items);
           setUserRooms(result.data.getUserRooms.items);
         }
       } catch (error) {
-        console.error('Error fetching user rooms:', error);
+        // エラー処理は必要に応じて追加
       }
     };
 
@@ -209,7 +199,6 @@ function ChatScreen({ user, onSignOut }) {
 
     setIsModalSearching(true);
     try {
-      console.log('Searching users for modal:', searchTerm);
       const result = await client.graphql({
         query: searchUsers,
         variables: { 
@@ -224,11 +213,9 @@ function ChatScreen({ user, onSignOut }) {
         const filteredUsers = result.data.searchUsers.items
           .filter(u => u.userId !== currentUser?.userId);
         
-        console.log('Modal search results:', filteredUsers);
         setModalSearchResults(filteredUsers);
       }
     } catch (error) {
-      console.error('Error searching users for modal:', error);
       setModalSearchResults([]);
     } finally {
       setIsModalSearching(false);
@@ -244,7 +231,6 @@ function ChatScreen({ user, onSignOut }) {
 
     setIsDmSearching(true);
     try {
-      console.log('Searching users for DM:', searchTerm);
       const result = await client.graphql({
         query: searchUsers,
         variables: { 
@@ -259,11 +245,9 @@ function ChatScreen({ user, onSignOut }) {
         const filteredUsers = result.data.searchUsers.items.filter(
           u => u.userId !== currentUser?.userId
         );
-        console.log('DM search results:', filteredUsers);
         setDmSearchResults(filteredUsers);
       }
     } catch (error) {
-      console.error('Error searching users for DM:', error);
       setDmSearchResults([]);
     } finally {
       setIsDmSearching(false);
@@ -303,8 +287,6 @@ function ChatScreen({ user, onSignOut }) {
     setIsRoomCreationLoading(true);
 
     try {
-      console.log('Creating room:', newRoomName, selectedUsers);
-      
       // Lambda関数による一括メンバー追加でルーム作成
       const result = await client.graphql({
         query: createGroupRoom,
@@ -319,7 +301,6 @@ function ChatScreen({ user, onSignOut }) {
       });
 
       if (result.data.createGroupRoom) {
-        console.log('Room created successfully:', result.data.createGroupRoom);
         const createdRoom = result.data.createGroupRoom;
         
         // UIを更新
@@ -341,8 +322,6 @@ function ChatScreen({ user, onSignOut }) {
         setSelectedSpace(createdRoom.roomName);
       }
     } catch (error) {
-      console.error('Error creating room:', error);
-      
       // エラーの詳細を表示
       let errorMessage = 'ルーム作成でエラーが発生しました。';
       if (error.errors && error.errors.length > 0) {
@@ -362,7 +341,6 @@ function ChatScreen({ user, onSignOut }) {
     if (!currentUser?.userId || !targetUserId) return;
 
     try {
-      console.log('Creating direct room with:', targetUserId);
       const result = await client.graphql({
         query: createDirectRoom,
         variables: {
@@ -373,7 +351,6 @@ function ChatScreen({ user, onSignOut }) {
       });
 
       if (result.data.createDirectRoom) {
-        console.log('Direct room created:', result.data.createDirectRoom);
         // ルーム一覧を更新
         const newRoom = {
           ...result.data.createDirectRoom,
@@ -383,7 +360,6 @@ function ChatScreen({ user, onSignOut }) {
         setUserRooms(prev => [newRoom, ...prev]);
       }
     } catch (error) {
-      console.error('Error creating direct room:', error);
       alert('ダイレクトルーム作成でエラーが発生しました: ' + error.message);
     }
   };
@@ -862,7 +838,7 @@ function App() {
     <div className="App">
       <header className="App-header">
         <img src={logo} className="App-logo" alt="logo" />
-        <h1>G00gleChat</h1>
+        <h1>Chat</h1>
         <div className="auth-buttons">
           <button 
             onClick={() => auth.signinRedirect()} 
