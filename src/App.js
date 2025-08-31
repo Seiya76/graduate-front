@@ -6,25 +6,30 @@ import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/api';
 import config from './aws-exports.js';
 
+// GraphQLクエリをインポート
+import { 
+  createGroupRoom, 
+  createDirectRoom, 
+  joinRoom 
+} from './graphql/mutations';
+
+import { 
+  getCurrentUser,
+  getUser, 
+  searchUsers, 
+  getUserRooms, 
+  getRoom 
+} from './graphql/queries';
+
+import { 
+  onRoomUpdate 
+} from './graphql/subscriptions';
+
 Amplify.configure(config);
 
 const client = generateClient();
 
-// GraphQLクエリを直接定義
-const GET_USER = `
-  query GetUser($userId: ID!) {
-    getUser(userId: $userId) {
-      userId
-      createdAt
-      email
-      emailVerified
-      nickname
-      status
-      updatedAt
-    }
-  }
-`;
-
+// getUserByEmailクエリが不足している場合は追加定義
 const GET_USER_BY_EMAIL = `
   query GetUserByEmail($email: String!) {
     getUserByEmail(email: $email) {
@@ -35,67 +40,7 @@ const GET_USER_BY_EMAIL = `
       nickname
       status
       updatedAt
-    }
-  }
-`;
-
-// ルーム関連のGraphQLクエリ
-const GET_USER_ROOMS = `
-  query GetUserRooms($userId: ID!, $limit: Int, $nextToken: String) {
-    getUserRooms(userId: $userId, limit: $limit, nextToken: $nextToken) {
-      items {
-        roomId
-        roomName
-        roomType
-        createdBy
-        lastMessage
-        lastMessageAt
-        memberCount
-        updatedAt
-      }
-      nextToken
-    }
-  }
-`;
-
-const CREATE_GROUP_ROOM = `
-  mutation CreateGroupRoom($input: CreateGroupRoomInput!) {
-    createGroupRoom(input: $input) {
-      roomId
-      roomName
-      roomType
-      createdBy
-      createdAt
-      memberCount
-      updatedAt
-    }
-  }
-`;
-
-const CREATE_DIRECT_ROOM = `
-  mutation CreateDirectRoom($targetUserId: ID!, $createdBy: ID!) {
-    createDirectRoom(targetUserId: $targetUserId, createdBy: $createdBy) {
-      roomId
-      roomName
-      roomType
-      createdBy
-      createdAt
-      memberCount
-      updatedAt
-    }
-  }
-`;
-
-// ユーザー検索クエリ
-const SEARCH_USERS = `
-  query SearchUsers($searchTerm: String!, $limit: Int) {
-    searchUsers(searchTerm: $searchTerm, limit: $limit) {
-      items {
-        userId
-        nickname
-        email
-        status
-      }
+      __typename
     }
   }
 `;
@@ -163,7 +108,7 @@ function ChatScreen({ user, onSignOut }) {
         // まずuserIdで検索を試す
         try {
           result = await client.graphql({
-            query: GET_USER,
+            query: getUser,
             variables: { userId: oidcSub },
             authMode: 'apiKey'
           });
@@ -233,7 +178,7 @@ function ChatScreen({ user, onSignOut }) {
       try {
         console.log('Fetching rooms for user:', currentUser.userId);
         const result = await client.graphql({
-          query: GET_USER_ROOMS,
+          query: getUserRooms,
           variables: { 
             userId: currentUser.userId,
             limit: 50 
@@ -255,118 +200,75 @@ function ChatScreen({ user, onSignOut }) {
     }
   }, [currentUser]);
 
-// 修正版: ユーザーフィルタリング処理
-const searchUsersForModal = async (searchTerm) => {
-  if (!searchTerm.trim()) {
-    setModalSearchResults([]);
-    return;
-  }
+  // 修正版: ユーザーフィルタリング処理
+  const searchUsersForModal = async (searchTerm) => {
+    if (!searchTerm.trim()) {
+      setModalSearchResults([]);
+      return;
+    }
 
-  setIsModalSearching(true);
-  try {
-    console.log('Searching users for modal:', searchTerm);
-    const result = await client.graphql({
-      query: SEARCH_USERS,
-      variables: { 
-        searchTerm: searchTerm.trim(),
-        limit: 50
-      },
-      authMode: 'apiKey'
-    });
+    setIsModalSearching(true);
+    try {
+      console.log('Searching users for modal:', searchTerm);
+      const result = await client.graphql({
+        query: searchUsers,
+        variables: { 
+          searchTerm: searchTerm.trim(),
+          limit: 50
+        },
+        authMode: 'apiKey'
+      });
 
-    if (result.data.searchUsers?.items) {
-      // 現在のユーザーを除外するのみ（statusフィルタリングを削除）
-      const filteredUsers = result.data.searchUsers.items
-        .filter(u => u.userId !== currentUser?.userId);
-        // .filter(u => u.status === 'active' || !u.status); ← この行を削除
+      if (result.data.searchUsers?.items) {
+        // 現在のユーザーを除外するのみ（statusフィルタリングを削除）
+        const filteredUsers = result.data.searchUsers.items
+          .filter(u => u.userId !== currentUser?.userId);
         
-      console.log('Modal search results:', filteredUsers);
-      setModalSearchResults(filteredUsers);
+        console.log('Modal search results:', filteredUsers);
+        setModalSearchResults(filteredUsers);
+      }
+    } catch (error) {
+      console.error('Error searching users for modal:', error);
+      setModalSearchResults([]);
+    } finally {
+      setIsModalSearching(false);
     }
-  } catch (error) {
-    console.error('Error searching users for modal:', error);
-    setModalSearchResults([]);
-  } finally {
-    setIsModalSearching(false);
-  }
-};
+  };
 
-// DM用検索も同様に修正
-const searchUsersForDM = async (searchTerm) => {
-  if (!searchTerm.trim()) {
-    setDmSearchResults([]);
-    return;
-  }
-
-  setIsDmSearching(true);
-  try {
-    console.log('Searching users for DM:', searchTerm);
-    const result = await client.graphql({
-      query: SEARCH_USERS,
-      variables: { 
-        searchTerm: searchTerm.trim(),
-        limit: 20 
-      },
-      authMode: 'apiKey'
-    });
-
-    if (result.data.searchUsers?.items) {
-      // 現在のユーザーを除外するのみ
-      const filteredUsers = result.data.searchUsers.items.filter(
-        u => u.userId !== currentUser?.userId
-      );
-      console.log('DM search results:', filteredUsers);
-      setDmSearchResults(filteredUsers);
+  // DM用検索も同様に修正
+  const searchUsersForDM = async (searchTerm) => {
+    if (!searchTerm.trim()) {
+      setDmSearchResults([]);
+      return;
     }
-  } catch (error) {
-    console.error('Error searching users for DM:', error);
-    setDmSearchResults([]);
-  } finally {
-    setIsDmSearching(false);
-  }
-};
 
-// より柔軟なstatusフィルタリングが必要な場合
-const searchUsersForModalWithStatus = async (searchTerm) => {
-  if (!searchTerm.trim()) {
-    setModalSearchResults([]);
-    return;
-  }
+    setIsDmSearching(true);
+    try {
+      console.log('Searching users for DM:', searchTerm);
+      const result = await client.graphql({
+        query: searchUsers,
+        variables: { 
+          searchTerm: searchTerm.trim(),
+          limit: 20 
+        },
+        authMode: 'apiKey'
+      });
 
-  setIsModalSearching(true);
-  try {
-    const result = await client.graphql({
-      query: SEARCH_USERS,
-      variables: { 
-        searchTerm: searchTerm.trim(),
-        limit: 50
-      },
-      authMode: 'apiKey'
-    });
-
-    if (result.data.searchUsers?.items) {
-      const filteredUsers = result.data.searchUsers.items
-        .filter(u => u.userId !== currentUser?.userId)
-        .filter(u => {
-          // より柔軟なstatusフィルタリング
-          const status = u.status?.toLowerCase();
-          return !status || // statusがnullまたは未定義
-                 status === 'active' ||
-                 status === 'confirmed' ||
-                 status === 'online';
-          // 'inactive', 'blocked', 'deleted' などは除外
-        });
-        
-      console.log('Filtered users:', filteredUsers);
-      setModalSearchResults(filteredUsers);
+      if (result.data.searchUsers?.items) {
+        // 現在のユーザーを除外するのみ
+        const filteredUsers = result.data.searchUsers.items.filter(
+          u => u.userId !== currentUser?.userId
+        );
+        console.log('DM search results:', filteredUsers);
+        setDmSearchResults(filteredUsers);
+      }
+    } catch (error) {
+      console.error('Error searching users for DM:', error);
+      setDmSearchResults([]);
+    } finally {
+      setIsDmSearching(false);
     }
-  } catch (error) {
-    console.error('Error searching users:', error);
-    setModalSearchResults([]);
-  } finally {
-    setIsModalSearching(false);
-  }
-};
+  };
 
   // モーダル検索のデバウンス処理
   useEffect(() => {
@@ -395,7 +297,7 @@ const searchUsersForModalWithStatus = async (searchTerm) => {
   }, [dmSearchTerm, currentUser]);
 
   // グループルーム作成（改善版）
-  const createGroupRoom = async () => {
+  const createGroupRoom_func = async () => {
     if (!newRoomName.trim() || !currentUser?.userId) return;
 
     setIsRoomCreationLoading(true);
@@ -405,7 +307,7 @@ const searchUsersForModalWithStatus = async (searchTerm) => {
       
       // Lambda関数による一括メンバー追加でルーム作成
       const result = await client.graphql({
-        query: CREATE_GROUP_ROOM,
+        query: createGroupRoom,
         variables: {
           input: {
             roomName: newRoomName.trim(),
@@ -423,8 +325,8 @@ const searchUsersForModalWithStatus = async (searchTerm) => {
         // UIを更新
         const newRoom = {
           ...createdRoom,
-          lastMessage: "未入力",
-          lastMessageAt: createdRoom.createdAt
+          lastMessage: createdRoom.lastMessage || "未入力",
+          lastMessageAt: createdRoom.lastMessageAt || createdRoom.createdAt
         };
         setUserRooms(prev => [newRoom, ...prev]);
         
@@ -456,13 +358,13 @@ const searchUsersForModalWithStatus = async (searchTerm) => {
   };
 
   // ダイレクトルーム作成
-  const createDirectRoom = async (targetUserId) => {
+  const createDirectRoom_func = async (targetUserId) => {
     if (!currentUser?.userId || !targetUserId) return;
 
     try {
       console.log('Creating direct room with:', targetUserId);
       const result = await client.graphql({
-        query: CREATE_DIRECT_ROOM,
+        query: createDirectRoom,
         variables: {
           targetUserId: targetUserId,
           createdBy: currentUser.userId
@@ -475,8 +377,8 @@ const searchUsersForModalWithStatus = async (searchTerm) => {
         // ルーム一覧を更新
         const newRoom = {
           ...result.data.createDirectRoom,
-          lastMessage: "未入力",
-          lastMessageAt: result.data.createDirectRoom.createdAt
+          lastMessage: result.data.createDirectRoom.lastMessage || "未入力",
+          lastMessageAt: result.data.createDirectRoom.lastMessageAt || result.data.createDirectRoom.createdAt
         };
         setUserRooms(prev => [newRoom, ...prev]);
       }
@@ -684,7 +586,7 @@ const searchUsersForModalWithStatus = async (searchTerm) => {
                   キャンセル
                 </button>
                 <button 
-                  onClick={createGroupRoom} 
+                  onClick={createGroupRoom_func} 
                   disabled={!newRoomName.trim() || isRoomCreationLoading}
                   className="create-room-btn"
                 >
@@ -798,7 +700,7 @@ const searchUsersForModalWithStatus = async (searchTerm) => {
                       key={user.userId} 
                       className="dm-search-result-item"
                       onClick={() => {
-                        createDirectRoom(user.userId);
+                        createDirectRoom_func(user.userId);
                         setDmSearchTerm("");
                         setDmSearchResults([]);
                       }}
