@@ -79,8 +79,8 @@ export const sendMessage = /* GraphQL */ `
   }
 `;
 export const deleteMessage = /* GraphQL */ `
-  mutation DeleteMessage($messageId: ID!) {
-    deleteMessage(messageId: $messageId) {
+  mutation DeleteMessage($messageId: ID!, $userId: ID) {
+    deleteMessage(messageId: $messageId, userId: $userId) {
       messageId
       success
       message
