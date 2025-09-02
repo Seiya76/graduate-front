@@ -54,7 +54,7 @@ export const useMessages = () => {
       sendMessage(currentUser, user);
     }
   };
-
+ 
   return {
     messages,
     newMessage,
