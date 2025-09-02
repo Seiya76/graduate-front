@@ -15,6 +15,9 @@ import { useMessages } from './hooks/useMessages';
 // ユーティリティ関数
 import { getDisplayName, getDisplayAvatar, formatTime } from './utils/userUtils';
 
+// コンポーネント
+import { ErrorMessage, LoadingSpinner, MessagesList } from './components';
+
 Amplify.configure(config);
 
 // Google Chat風のチャット画面コンポーネント
@@ -54,13 +57,33 @@ function ChatScreen({ user, onSignOut }) {
     resetModal
   } = useModal();
   
+  // 選択されたルームのIDを取得
+  const selectedRoomId = React.useMemo(() => {
+    if (selectedSpace === "ホーム") return null;
+    
+    const groupRoom = groupRooms.find(room => room.roomName === selectedSpace);
+    if (groupRoom) return groupRoom.roomId;
+    
+    const directRoom = directRooms.find(room => room.roomName === selectedSpace);
+    if (directRoom) return directRoom.roomId;
+    
+    return null;
+  }, [selectedSpace, groupRooms, directRooms]);
+  
   const {
     messages,
     newMessage,
     setNewMessage,
     sendMessage,
-    handleKeyPress
-  } = useMessages();
+    handleKeyPress,
+    isLoading: isMessagesLoading,
+    isSending,
+    error: messagesError,
+    hasMore,
+    loadMoreMessages,
+    messagesEndRef,
+    scrollToBottom
+  } = useMessages(selectedRoomId, currentUser);
 
   // ルーム作成ハンドラー
   const handleCreateGroupRoom = async () => {
@@ -93,7 +116,11 @@ function ChatScreen({ user, onSignOut }) {
   // ダイレクトルーム作成ハンドラー
   const handleCreateDirectRoom = async (targetUserId) => {
     try {
-      await createDirectRoom_func(targetUserId);
+      const createdRoom = await createDirectRoom_func(targetUserId);
+      if (createdRoom) {
+        setSelectedSpace(createdRoom.roomName);
+        setDmSearchTerm("");
+      }
     } catch (error) {
       alert('ダイレクトルーム作成でエラーが発生しました: ' + error.message);
     }
@@ -298,7 +325,7 @@ function ChatScreen({ user, onSignOut }) {
             {directRooms.map((room) => (
               <div 
                 key={room.roomId} 
-                className="nav-item dm-item"
+                className={`nav-item dm-item ${selectedSpace === room.roomName ? 'active' : ''}`}
                 onClick={() => setSelectedSpace(room.roomName)}
               >
                 <span className="nav-icon user-avatar">
@@ -334,10 +361,7 @@ function ChatScreen({ user, onSignOut }) {
                     <div 
                       key={searchUser.userId} 
                       className="dm-search-result-item"
-                      onClick={() => {
-                        handleCreateDirectRoom(searchUser.userId);
-                        setDmSearchTerm("");
-                      }}
+                      onClick={() => handleCreateDirectRoom(searchUser.userId)}
                     >
                       <span className="nav-icon user-avatar">
                         {(searchUser.nickname || searchUser.email).substring(0, 2).toUpperCase()}
@@ -382,6 +406,12 @@ function ChatScreen({ user, onSignOut }) {
           </div>
         </div>
 
+        {/* エラー表示 */}
+        <ErrorMessage 
+          error={messagesError} 
+          onDismiss={() => {/* setError(null) */}} 
+        />
+
         {/* メッセージ一覧 */}
         <div className="messages-container">
           <div className="messages-list">
@@ -405,51 +435,98 @@ function ChatScreen({ user, onSignOut }) {
                 </div>
               </div>
             ) : (
-              messages.map((message) => (
-                <div 
-                  key={message.id} 
-                  className={`message-item ${message.isOwn ? 'own-message' : ''}`}
-                >
-                  {!message.isOwn && (
-                    <div className="message-avatar user-avatar">{message.avatar}</div>
-                  )}
-                  <div className="message-content">
-                    <div className="message-header">
-                      <span className="sender-name">{message.sender}</span>
-                      <span className="message-time">{message.time}</span>
-                    </div>
-                    <div className="message-text">{message.content}</div>
+              <>
+                {/* 初回読み込み表示 */}
+                {isMessagesLoading && messages.length === 0 && (
+                  <LoadingSpinner text="メッセージを読み込み中..." />
+                )}
+                
+                {/* 古いメッセージ読み込み */}
+                {hasMore && messages.length > 0 && (
+                  <div className="load-more-container">
+                    <button 
+                      className="load-more-btn" 
+                      onClick={loadMoreMessages}
+                      disabled={isMessagesLoading}
+                    >
+                      {isMessagesLoading ? '読み込み中...' : '過去のメッセージを読み込む'}
+                    </button>
                   </div>
-                </div>
-              ))
+                )}
+                
+                {/* メッセージリスト */}
+                {messages.map((message, index) => {
+                  const showAvatar = index === 0 || messages[index - 1].userId !== message.userId;
+                  const isLastFromUser = index === messages.length - 1 || messages[index + 1]?.userId !== message.userId;
+                  
+                  return (
+                    <div 
+                      key={message.messageId || message.id} 
+                      className={`message-item ${message.isOwn ? 'own-message' : ''} ${isLastFromUser ? 'last-from-user' : ''}`}
+                    >
+                      {!message.isOwn && showAvatar && (
+                        <div className="message-avatar user-avatar">{message.avatar}</div>
+                      )}
+                      <div className={`message-content ${!message.isOwn && !showAvatar ? 'no-avatar' : ''}`}>
+                        {showAvatar && (
+                          <div className="message-header">
+                            <span className="sender-name">{message.sender}</span>
+                            <span className="message-time">{message.time}</span>
+                          </div>
+                        )}
+                        <div className="message-text">{message.content}</div>
+                        {!showAvatar && (
+                          <div className="message-time-inline">{message.time}</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {/* メッセージリストの最下部参照用 */}
+                <div ref={messagesEndRef} />
+              </>
             )}
           </div>
         </div>
 
         {/* メッセージ入力 */}
-        {selectedSpace !== "ホーム" && (
+        {selectedSpace !== "ホーム" && selectedRoomId && (
           <div className="message-input-area">
             <div className="input-container">
               <button className="attach-btn" title="ファイル添付"></button>
               <textarea
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                onKeyPress={(e) => handleKeyPress(e, currentUser, user)}
+                onKeyPress={handleKeyPress}
                 placeholder={`${selectedSpace}にメッセージを送信`}
                 className="message-input"
                 rows="1"
+                disabled={isSending}
               />
               <div className="input-actions">
                 <button className="icon-btn emoji-btn" title="絵文字"></button>
                 <button 
-                  onClick={() => sendMessage(currentUser, user)} 
-                  className={`send-btn ${newMessage.trim() ? 'active' : ''}`}
-                  disabled={!newMessage.trim()}
-                  title="送信"
+                  onClick={sendMessage} 
+                  className={`send-btn ${newMessage.trim() && !isSending ? 'active' : ''}`}
+                  disabled={!newMessage.trim() || isSending}
+                  title={isSending ? "送信中..." : "送信"}
                 >
+                  {isSending ? (
+                    <span className="loading-spinner-small"></span>
+                  ) : (
+                    "📤"
+                  )}
                 </button>
               </div>
             </div>
+            
+            {/* 送信状態表示 */}
+            {isSending && (
+              <div className="sending-indicator">
+                メッセージを送信中...
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -468,20 +545,18 @@ function App() {
   };
 
   if (auth.isLoading) {
-    return (
-      <div className="loading-screen">
-        <div className="loading-spinner"></div>
-        <div>読み込み中...</div>
-      </div>
-    );
+    return <LoadingSpinner text="認証中..." />;
   }
 
   if (auth.error) {
     return (
       <div className="error-screen">
         <div className="error-message">
-          エラーが発生しました: {auth.error.message}
+          認証エラーが発生しました: {auth.error.message}
         </div>
+        <button onClick={() => window.location.reload()}>
+          再読み込み
+        </button>
       </div>
     );
   }
