@@ -54,3 +54,37 @@ export const leaveRoom = /* GraphQL */ `
     }
   }
 `;
+export const sendMessage = /* GraphQL */ `
+  mutation SendMessage($input: SendMessageInput!) {
+    sendMessage(input: $input) {
+      messageId
+      roomId
+      userId
+      content
+      messageType
+      createdAt
+      updatedAt
+      user {
+        userId
+        createdAt
+        email
+        emailVerified
+        nickname
+        status
+        updatedAt
+        __typename
+      }
+      __typename
+    }
+  }
+`;
+export const deleteMessage = /* GraphQL */ `
+  mutation DeleteMessage($messageId: ID!) {
+    deleteMessage(messageId: $messageId) {
+      messageId
+      success
+      message
+      __typename
+    }
+  }
+`;
