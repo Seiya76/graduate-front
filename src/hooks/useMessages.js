@@ -3,7 +3,8 @@ import { generateClient } from 'aws-amplify/api';
 import { sendMessage as sendMessageMutation } from '../graphql/mutations';
 import { getRoomMessages } from '../graphql/queries';
 import { onNewMessage, onMessageDeleted } from '../graphql/subscriptions';
-import { formatMessageForDisplay, validateMessageInput, getJapaneseErrorMessage } from '../utils/messageUtils';
+
+const client = generateClient();
 
 export const useMessages = (selectedRoomId, currentUser) => {
   const [messages, setMessages] = useState([]);
@@ -14,7 +15,6 @@ export const useMessages = (selectedRoomId, currentUser) => {
   const [hasMore, setHasMore] = useState(true);
   const [nextToken, setNextToken] = useState(null);
   
-  const client = generateClient();
   const subscriptionsRef = useRef([]);
   const messagesEndRef = useRef(null);
 
@@ -30,11 +30,12 @@ export const useMessages = (selectedRoomId, currentUser) => {
     if (!isLoadMore) {
       setIsLoading(true);
       setMessages([]);
+      setNextToken(null);
     }
     setError(null);
     
     try {
-      const response = await client.graphql({
+      const result = await client.graphql({
         query: getRoomMessages,
         variables: {
           roomId: roomId,
@@ -42,34 +43,46 @@ export const useMessages = (selectedRoomId, currentUser) => {
           nextToken: isLoadMore ? nextToken : null,
           sortDirection: 'ASC'
         },
-        authMode: 'API_KEY'
+        authMode: 'apiKey'
       });
       
-      const fetchedMessages = response.data.getRoomMessages.items.map(msg => 
-        formatMessageForDisplay(msg, currentUser?.userId)
-      );
-      
-      if (isLoadMore) {
-        setMessages(prevMessages => [...fetchedMessages, ...prevMessages]);
-      } else {
-        setMessages(fetchedMessages);
+      if (result.data.getRoomMessages?.items) {
+        const fetchedMessages = result.data.getRoomMessages.items.map(msg => ({
+          id: msg.messageId,
+          messageId: msg.messageId,
+          sender: msg.user?.nickname || msg.user?.email || '不明なユーザー',
+          content: msg.content,
+          time: new Date(msg.createdAt).toLocaleTimeString('ja-JP', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          }),
+          isOwn: msg.userId === currentUser?.userId,
+          avatar: (msg.user?.nickname || msg.user?.email || 'UN').substring(0, 2).toUpperCase(),
+          userId: msg.userId,
+          createdAt: msg.createdAt
+        }));
+        
+        if (isLoadMore) {
+          setMessages(prevMessages => [...fetchedMessages, ...prevMessages]);
+        } else {
+          setMessages(fetchedMessages);
+        }
+        
+        setHasMore(result.data.getRoomMessages.hasMore || false);
+        setNextToken(result.data.getRoomMessages.nextToken || null);
+        
+        // 新しいメッセージ読み込み時は最下部にスクロール
+        if (!isLoadMore && fetchedMessages.length > 0) {
+          setTimeout(scrollToBottom, 100);
+        }
       }
-      
-      setHasMore(response.data.getRoomMessages.hasMore || false);
-      setNextToken(response.data.getRoomMessages.nextToken || null);
-      
-      // 新しいメッセージ読み込み時は最下部にスクロール
-      if (!isLoadMore) {
-        setTimeout(scrollToBottom, 100);
-      }
-      
     } catch (err) {
       console.error('メッセージ取得エラー:', err);
-      setError(getJapaneseErrorMessage(err));
+      setError('メッセージの取得に失敗しました');
     } finally {
       setIsLoading(false);
     }
-  }, [selectedRoomId, currentUser?.userId, client, nextToken, scrollToBottom]);
+  }, [selectedRoomId, currentUser?.userId, nextToken, scrollToBottom]);
 
   // メッセージ送信
   const sendMessage = useCallback(async () => {
@@ -77,10 +90,9 @@ export const useMessages = (selectedRoomId, currentUser) => {
       return;
     }
 
-    try {
-      validateMessageInput(newMessage, selectedRoomId, currentUser.userId);
-    } catch (validationError) {
-      alert(validationError.message);
+    // バリデーション
+    if (newMessage.length > 2000) {
+      alert('メッセージが長すぎます（2000文字以内）');
       return;
     }
 
@@ -90,7 +102,7 @@ export const useMessages = (selectedRoomId, currentUser) => {
     setError(null);
     
     try {
-      const response = await client.graphql({
+      const result = await client.graphql({
         query: sendMessageMutation,
         variables: {
           input: {
@@ -100,17 +112,24 @@ export const useMessages = (selectedRoomId, currentUser) => {
             messageType: 'TEXT'
           }
         },
-        authMode: 'API_KEY'
+        authMode: 'apiKey'
       });
       
-      console.log('メッセージ送信成功:', response.data.sendMessage);
+      console.log('メッセージ送信成功:', result.data.sendMessage);
       
       // 送信成功後は subscription で新しいメッセージを受信するので
       // ここでは messages を直接更新しない
       
     } catch (err) {
       console.error('メッセージ送信エラー:', err);
-      const errorMessage = getJapaneseErrorMessage(err);
+      
+      let errorMessage = 'メッセージの送信に失敗しました';
+      if (err.errors && err.errors.length > 0) {
+        errorMessage += ': ' + err.errors[0].message;
+      } else if (err.message) {
+        errorMessage += ': ' + err.message;
+      }
+      
       setError(errorMessage);
       
       // エラーの場合は入力を復元
@@ -121,7 +140,7 @@ export const useMessages = (selectedRoomId, currentUser) => {
     } finally {
       setIsSending(false);
     }
-  }, [newMessage, selectedRoomId, currentUser, client, isSending]);
+  }, [newMessage, selectedRoomId, currentUser, isSending]);
 
   // キーボードイベントハンドラー
   const handleKeyPress = useCallback((e) => {
@@ -155,12 +174,26 @@ export const useMessages = (selectedRoomId, currentUser) => {
         const subscription = client.graphql({
           query: onNewMessage,
           variables: { roomId: selectedRoomId },
-          authMode: 'API_KEY'
+          authMode: 'apiKey'
         }).subscribe({
           next: (response) => {
+            console.log('新しいメッセージを受信:', response);
             const newMsg = response.data.onNewMessage;
             if (newMsg) {
-              const formattedMessage = formatMessageForDisplay(newMsg, currentUser?.userId);
+              const formattedMessage = {
+                id: newMsg.messageId,
+                messageId: newMsg.messageId,
+                sender: newMsg.user?.nickname || newMsg.user?.email || '不明なユーザー',
+                content: newMsg.content,
+                time: new Date(newMsg.createdAt).toLocaleTimeString('ja-JP', { 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                }),
+                isOwn: newMsg.userId === currentUser?.userId,
+                avatar: (newMsg.user?.nickname || newMsg.user?.email || 'UN').substring(0, 2).toUpperCase(),
+                userId: newMsg.userId,
+                createdAt: newMsg.createdAt
+              };
               
               setMessages(prevMessages => {
                 // 重複チェック
@@ -193,9 +226,10 @@ export const useMessages = (selectedRoomId, currentUser) => {
         const subscription = client.graphql({
           query: onMessageDeleted,
           variables: { roomId: selectedRoomId },
-          authMode: 'API_KEY'
+          authMode: 'apiKey'
         }).subscribe({
           next: (response) => {
+            console.log('メッセージ削除を受信:', response);
             const deletedMsg = response.data.onMessageDeleted;
             if (deletedMsg && deletedMsg.success) {
               setMessages(prevMessages => 
@@ -225,7 +259,7 @@ export const useMessages = (selectedRoomId, currentUser) => {
       });
       subscriptionsRef.current = [];
     };
-  }, [selectedRoomId, currentUser?.userId, client, scrollToBottom]);
+  }, [selectedRoomId, currentUser?.userId, scrollToBottom]);
 
   // ルーム変更時にメッセージを取得
   useEffect(() => {

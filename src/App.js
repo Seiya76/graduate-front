@@ -15,9 +15,6 @@ import { useMessages } from './hooks/useMessages';
 // ユーティリティ関数
 import { getDisplayName, getDisplayAvatar, formatTime } from './utils/userUtils';
 
-// コンポーネント
-import { ErrorMessage, LoadingSpinner, MessagesList } from './components';
-
 Amplify.configure(config);
 
 // Google Chat風のチャット画面コンポーネント
@@ -70,6 +67,7 @@ function ChatScreen({ user, onSignOut }) {
     return null;
   }, [selectedSpace, groupRooms, directRooms]);
   
+  // メッセージ機能
   const {
     messages,
     newMessage,
@@ -81,8 +79,7 @@ function ChatScreen({ user, onSignOut }) {
     error: messagesError,
     hasMore,
     loadMoreMessages,
-    messagesEndRef,
-    scrollToBottom
+    messagesEndRef
   } = useMessages(selectedRoomId, currentUser);
 
   // ルーム作成ハンドラー
@@ -101,6 +98,7 @@ function ChatScreen({ user, onSignOut }) {
         setSelectedSpace(createdRoom.roomName);
       }
     } catch (error) {
+      console.error('ルーム作成エラー:', error);
       let errorMessage = 'ルーム作成でエラーが発生しました。';
       if (error.errors && error.errors.length > 0) {
         errorMessage += '\n' + error.errors.map(e => e.message).join('\n');
@@ -122,6 +120,7 @@ function ChatScreen({ user, onSignOut }) {
         setDmSearchTerm("");
       }
     } catch (error) {
+      console.error('ダイレクトルーム作成エラー:', error);
       alert('ダイレクトルーム作成でエラーが発生しました: ' + error.message);
     }
   };
@@ -407,10 +406,14 @@ function ChatScreen({ user, onSignOut }) {
         </div>
 
         {/* エラー表示 */}
-        <ErrorMessage 
-          error={messagesError} 
-          onDismiss={() => {/* setError(null) */}} 
-        />
+        {messagesError && (
+          <div className="error-banner">
+            <div className="error-content">
+              <span className="error-icon">⚠️</span>
+              <span className="error-text">{messagesError}</span>
+            </div>
+          </div>
+        )}
 
         {/* メッセージ一覧 */}
         <div className="messages-container">
@@ -438,7 +441,10 @@ function ChatScreen({ user, onSignOut }) {
               <>
                 {/* 初回読み込み表示 */}
                 {isMessagesLoading && messages.length === 0 && (
-                  <LoadingSpinner text="メッセージを読み込み中..." />
+                  <div className="loading-message">
+                    <div className="loading-spinner"></div>
+                    <div>メッセージを読み込み中...</div>
+                  </div>
                 )}
                 
                 {/* 古いメッセージ読み込み */}
@@ -494,7 +500,7 @@ function ChatScreen({ user, onSignOut }) {
         {selectedSpace !== "ホーム" && selectedRoomId && (
           <div className="message-input-area">
             <div className="input-container">
-              <button className="attach-btn" title="ファイル添付"></button>
+              <button className="attach-btn" title="ファイル添付">📎</button>
               <textarea
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
@@ -505,7 +511,7 @@ function ChatScreen({ user, onSignOut }) {
                 disabled={isSending}
               />
               <div className="input-actions">
-                <button className="icon-btn emoji-btn" title="絵文字"></button>
+                <button className="icon-btn emoji-btn" title="絵文字">😊</button>
                 <button 
                   onClick={sendMessage} 
                   className={`send-btn ${newMessage.trim() && !isSending ? 'active' : ''}`}
@@ -545,18 +551,20 @@ function App() {
   };
 
   if (auth.isLoading) {
-    return <LoadingSpinner text="認証中..." />;
+    return (
+      <div className="loading-screen">
+        <div className="loading-spinner"></div>
+        <div>読み込み中...</div>
+      </div>
+    );
   }
 
   if (auth.error) {
     return (
       <div className="error-screen">
         <div className="error-message">
-          認証エラーが発生しました: {auth.error.message}
+          エラーが発生しました: {auth.error.message}
         </div>
-        <button onClick={() => window.location.reload()}>
-          再読み込み
-        </button>
       </div>
     );
   }
