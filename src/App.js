@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import logo from "./logo.svg";
 import "./App.css";
 import { useAuth } from "react-oidc-context";
+import { events } from 'aws-amplify/data';
 import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/api';
 import config from './aws-exports.js';
