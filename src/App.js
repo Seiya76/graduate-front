@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import logo from "./logo.svg";
 import "./App.css";
 import { useAuth } from "react-oidc-context";
@@ -10,7 +10,8 @@ import config from './aws-exports.js';
 import { 
   createGroupRoom, 
   createDirectRoom, 
-  joinRoom 
+  joinRoom,
+  sendMessage as sendMessageMutation
 } from './graphql/mutations';
 
 import { 
@@ -18,11 +19,14 @@ import {
   getUser, 
   searchUsers, 
   getUserRooms, 
-  getRoom 
+  getRoom,
+  getRoomMessages
 } from './graphql/queries';
 
 import { 
-  onRoomUpdate 
+  onRoomUpdate,
+  onNewMessage,
+  onMessageDeleted
 } from './graphql/subscriptions';
 
 Amplify.configure(config);
@@ -65,33 +69,39 @@ function ChatScreen({ user, onSignOut }) {
   const [isRoomCreationLoading, setIsRoomCreationLoading] = useState(false);
   const [newRoomName, setNewRoomName] = useState("");
   const [selectedUsers, setSelectedUsers] = useState([]);
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      sender: "システム",
-      content: "チャットへようこそ！",
-      time: "10:00",
-      isOwn: false,
-      avatar: "SY"
-    },
-    {
-      id: 2,
-      sender: "田中太郎",
-      content: "おはようございます！今日もよろしくお願いします。",
-      time: "10:15",
-      isOwn: false,
-      avatar: "TT"
-    },
-    {
-      id: 3,
-      sender: "佐藤花子",
-      content: "プロジェクトの進捗はいかがでしょうか？",
-      time: "10:30",
-      isOwn: false,
-      avatar: "SH"
-    }
-  ]);
+
+  // メッセージ機能用のstate
+  const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [messageError, setMessageError] = useState(null);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [nextToken, setNextToken] = useState(null);
+
+  // リアルタイム機能用のref
+  const subscriptionsRef = useRef([]);
+  const messagesEndRef = useRef(null);
+
+  // 選択されたルームのID取得
+  const selectedRoomId = React.useMemo(() => {
+    if (selectedSpace === "ホーム") return null;
+    
+    const groupRoom = userRooms.find(room => room.roomName === selectedSpace && room.roomType === 'group');
+    if (groupRoom) return groupRoom.roomId;
+    
+    const directRoom = userRooms.find(room => room.roomName === selectedSpace && room.roomType === 'direct');
+    if (directRoom) return directRoom.roomId;
+    
+    return null;
+  }, [selectedSpace, userRooms]);
+
+  // メッセージリストの最下部にスクロール
+  const scrollToBottom = useCallback(() => {
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+  }, []);
 
   // AppSyncからユーザー情報を取得
   useEffect(() => {
@@ -199,6 +209,271 @@ function ChatScreen({ user, onSignOut }) {
       fetchUserRooms();
     }
   }, [currentUser]);
+
+  // メッセージ取得
+  const fetchMessages = useCallback(async (roomId, isLoadMore = false) => {
+    if (!roomId) return;
+    
+    if (!isLoadMore) {
+      setIsLoadingMessages(true);
+      setMessages([]);
+      setNextToken(null);
+    }
+    setMessageError(null);
+    
+    try {
+      console.log('Fetching messages for room:', roomId);
+      const result = await client.graphql({
+        query: getRoomMessages,
+        variables: {
+          roomId: roomId,
+          limit: 50,
+          nextToken: isLoadMore ? nextToken : null,
+          sortDirection: 'ASC'
+        },
+        authMode: 'apiKey'
+      });
+      
+      if (result.data?.getRoomMessages?.items) {
+        const fetchedMessages = result.data.getRoomMessages.items.map(msg => ({
+          id: msg.messageId,
+          messageId: msg.messageId,
+          sender: msg.user?.nickname || msg.user?.email || '不明なユーザー',
+          content: msg.content,
+          time: new Date(msg.createdAt).toLocaleTimeString('ja-JP', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          }),
+          isOwn: msg.userId === currentUser?.userId,
+          avatar: (msg.user?.nickname || msg.user?.email || 'UN').substring(0, 2).toUpperCase(),
+          userId: msg.userId,
+          createdAt: msg.createdAt
+        }));
+        
+        if (isLoadMore) {
+          setMessages(prevMessages => [...fetchedMessages, ...prevMessages]);
+        } else {
+          setMessages(fetchedMessages);
+          if (fetchedMessages.length > 0) {
+            scrollToBottom();
+          }
+        }
+        
+        setHasMoreMessages(result.data.getRoomMessages.hasMore || false);
+        setNextToken(result.data.getRoomMessages.nextToken || null);
+      }
+    } catch (err) {
+      console.error('メッセージ取得エラー:', err);
+      setMessageError('メッセージの取得に失敗しました');
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  }, [currentUser?.userId, nextToken, scrollToBottom]);
+
+  // メッセージ送信
+  const sendMessage = useCallback(async () => {
+    if (!newMessage.trim() || !selectedRoomId || !currentUser?.userId || isSendingMessage) {
+      return;
+    }
+
+    // バリデーション
+    if (newMessage.length > 2000) {
+      alert('メッセージが長すぎます（2000文字以内）');
+      return;
+    }
+
+    const messageContent = newMessage.trim();
+    setNewMessage(""); // すぐに入力をクリア
+    setIsSendingMessage(true);
+    setMessageError(null);
+    
+    try {
+      console.log('Sending message to room:', selectedRoomId);
+      const result = await client.graphql({
+        query: sendMessageMutation,
+        variables: {
+          input: {
+            roomId: selectedRoomId,
+            userId: currentUser.userId,
+            content: messageContent,
+            messageType: 'TEXT'
+          }
+        },
+        authMode: 'apiKey'
+      });
+      
+      console.log('メッセージ送信成功:', result.data?.sendMessage);
+      
+    } catch (err) {
+      console.error('メッセージ送信エラー:', err);
+      
+      let errorMessage = 'メッセージの送信に失敗しました';
+      if (err.errors && err.errors.length > 0) {
+        errorMessage += ': ' + err.errors[0].message;
+      } else if (err.message) {
+        errorMessage += ': ' + err.message;
+      }
+      
+      setMessageError(errorMessage);
+      setNewMessage(messageContent); // エラーの場合は入力を復元
+      alert(errorMessage);
+    } finally {
+      setIsSendingMessage(false);
+    }
+  }, [newMessage, selectedRoomId, currentUser, isSendingMessage]);
+
+  // キーボードイベントハンドラー
+  const handleKeyPress = useCallback((e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }, [sendMessage]);
+
+  // 古いメッセージを読み込む
+  const loadMoreMessages = useCallback(() => {
+    if (!hasMoreMessages || isLoadingMessages || !selectedRoomId) return;
+    fetchMessages(selectedRoomId, true);
+  }, [hasMoreMessages, isLoadingMessages, selectedRoomId, fetchMessages]);
+
+  // サブスクリプション設定
+  useEffect(() => {
+    if (!selectedRoomId) {
+      // サブスクリプションをクリーンアップ
+      subscriptionsRef.current.forEach(sub => {
+        try {
+          if (sub && typeof sub.unsubscribe === 'function') {
+            sub.unsubscribe();
+          }
+        } catch (err) {
+          console.warn('サブスクリプションのクリーンアップエラー:', err);
+        }
+      });
+      subscriptionsRef.current = [];
+      return;
+    }
+
+    // 既存のサブスクリプションをクリーンアップ
+    subscriptionsRef.current.forEach(sub => {
+      try {
+        if (sub && typeof sub.unsubscribe === 'function') {
+          sub.unsubscribe();
+        }
+      } catch (err) {
+        console.warn('サブスクリプションのクリーンアップエラー:', err);
+      }
+    });
+    subscriptionsRef.current = [];
+
+    // 新しいメッセージのサブスクリプション
+    const setupSubscriptions = async () => {
+      try {
+        console.log('Setting up subscriptions for room:', selectedRoomId);
+        
+        // 新しいメッセージサブスクリプション
+        const newMessageSub = client.graphql({
+          query: onNewMessage,
+          variables: { roomId: selectedRoomId },
+          authMode: 'apiKey'
+        }).subscribe({
+          next: (response) => {
+            console.log('新しいメッセージを受信:', response);
+            const newMsg = response.data?.onNewMessage;
+            if (newMsg) {
+              const formattedMessage = {
+                id: newMsg.messageId,
+                messageId: newMsg.messageId,
+                sender: newMsg.user?.nickname || newMsg.user?.email || '不明なユーザー',
+                content: newMsg.content,
+                time: new Date(newMsg.createdAt).toLocaleTimeString('ja-JP', { 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                }),
+                isOwn: newMsg.userId === currentUser?.userId,
+                avatar: (newMsg.user?.nickname || newMsg.user?.email || 'UN').substring(0, 2).toUpperCase(),
+                userId: newMsg.userId,
+                createdAt: newMsg.createdAt
+              };
+              
+              setMessages(prevMessages => {
+                // 重複チェック
+                const exists = prevMessages.some(msg => msg.messageId === formattedMessage.messageId);
+                if (!exists) {
+                  scrollToBottom();
+                  return [...prevMessages, formattedMessage];
+                }
+                return prevMessages;
+              });
+            }
+          },
+          error: (err) => {
+            console.error('メッセージサブスクリプションエラー:', err);
+            setMessageError('リアルタイム通信でエラーが発生しました');
+          }
+        });
+        
+        subscriptionsRef.current.push(newMessageSub);
+
+        // メッセージ削除サブスクリプション
+        const deleteSub = client.graphql({
+          query: onMessageDeleted,
+          variables: { roomId: selectedRoomId },
+          authMode: 'apiKey'
+        }).subscribe({
+          next: (response) => {
+            console.log('メッセージ削除を受信:', response);
+            const deletedMsg = response.data?.onMessageDeleted;
+            if (deletedMsg && deletedMsg.success) {
+              setMessages(prevMessages => 
+                prevMessages.filter(msg => msg.messageId !== deletedMsg.messageId)
+              );
+            }
+          },
+          error: (err) => {
+            console.error('削除サブスクリプションエラー:', err);
+          }
+        });
+        
+        subscriptionsRef.current.push(deleteSub);
+        
+      } catch (err) {
+        console.error('サブスクリプション設定エラー:', err);
+      }
+    };
+
+    setupSubscriptions();
+
+    return () => {
+      subscriptionsRef.current.forEach(sub => {
+        try {
+          if (sub && typeof sub.unsubscribe === 'function') {
+            sub.unsubscribe();
+          }
+        } catch (err) {
+          console.warn('サブスクリプションのクリーンアップエラー:', err);
+        }
+      });
+      subscriptionsRef.current = [];
+    };
+  }, [selectedRoomId, currentUser?.userId, scrollToBottom]);
+
+  // ルーム変更時にメッセージを取得
+  useEffect(() => {
+    if (selectedRoomId && currentUser?.userId) {
+      fetchMessages(selectedRoomId);
+    } else {
+      setMessages([]);
+      setMessageError(null);
+    }
+  }, [selectedRoomId, currentUser?.userId, fetchMessages]);
+
+  // エラー自動クリア
+  useEffect(() => {
+    if (messageError) {
+      const timer = setTimeout(() => setMessageError(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [messageError]);
 
   // 修正版: ユーザーフィルタリング処理
   const searchUsersForModal = async (searchTerm) => {
@@ -381,36 +656,11 @@ function ChatScreen({ user, onSignOut }) {
           lastMessageAt: result.data.createDirectRoom.lastMessageAt || result.data.createDirectRoom.createdAt
         };
         setUserRooms(prev => [newRoom, ...prev]);
+        setSelectedSpace(result.data.createDirectRoom.roomName);
       }
     } catch (error) {
       console.error('Error creating direct room:', error);
       alert('ダイレクトルーム作成でエラーが発生しました: ' + error.message);
-    }
-  };
-
-  const sendMessage = () => {
-    if (newMessage.trim()) {
-      const displayName = currentUser?.nickname || user.profile.name || user.profile.email.split('@')[0];
-      const message = {
-        id: messages.length + 1,
-        sender: displayName,
-        content: newMessage,
-        time: new Date().toLocaleTimeString('ja-JP', { 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        }),
-        isOwn: true,
-        avatar: displayName.substring(0, 2).toUpperCase()
-      };
-      setMessages([...messages, message]);
-      setNewMessage("");
-    }
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
     }
   };
 
@@ -662,7 +912,7 @@ function ChatScreen({ user, onSignOut }) {
               return (
                 <div 
                   key={room.roomId} 
-                  className="nav-item dm-item"
+                  className={`nav-item dm-item ${selectedSpace === room.roomName ? 'active' : ''}`}
                   onClick={() => setSelectedSpace(room.roomName)}
                 >
                   <span className="nav-icon user-avatar">
@@ -748,6 +998,16 @@ function ChatScreen({ user, onSignOut }) {
           </div>
         </div>
 
+        {/* エラー表示 */}
+        {messageError && (
+          <div className="error-banner">
+            <div className="error-content">
+              <span className="error-icon">⚠️</span>
+              <span className="error-text">{messageError}</span>
+            </div>
+          </div>
+        )}
+
         {/* メッセージ一覧 */}
         <div className="messages-container">
           <div className="messages-list">
@@ -771,32 +1031,69 @@ function ChatScreen({ user, onSignOut }) {
                 </div>
               </div>
             ) : (
-              messages.map((message) => (
-                <div 
-                  key={message.id} 
-                  className={`message-item ${message.isOwn ? 'own-message' : ''}`}
-                >
-                  {!message.isOwn && (
-                    <div className="message-avatar user-avatar">{message.avatar}</div>
-                  )}
-                  <div className="message-content">
-                    <div className="message-header">
-                      <span className="sender-name">{message.sender}</span>
-                      <span className="message-time">{message.time}</span>
-                    </div>
-                    <div className="message-text">{message.content}</div>
+              <>
+                {/* 初回読み込み表示 */}
+                {isLoadingMessages && messages.length === 0 && (
+                  <div className="loading-message">
+                    <div className="loading-spinner"></div>
+                    <div>メッセージを読み込み中...</div>
                   </div>
-                </div>
-              ))
+                )}
+                
+                {/* 古いメッセージ読み込み */}
+                {hasMoreMessages && messages.length > 0 && (
+                  <div className="load-more-container">
+                    <button 
+                      className="load-more-btn" 
+                      onClick={loadMoreMessages}
+                      disabled={isLoadingMessages}
+                    >
+                      {isLoadingMessages ? '読み込み中...' : '過去のメッセージを読み込む'}
+                    </button>
+                  </div>
+                )}
+                
+                {/* メッセージリスト */}
+                {messages.map((message, index) => {
+                  const showAvatar = index === 0 || messages[index - 1].userId !== message.userId;
+                  const isLastFromUser = index === messages.length - 1 || messages[index + 1]?.userId !== message.userId;
+                  
+                  return (
+                    <div 
+                      key={message.messageId || message.id} 
+                      className={`message-item ${message.isOwn ? 'own-message' : ''} ${isLastFromUser ? 'last-from-user' : ''}`}
+                    >
+                      {!message.isOwn && showAvatar && (
+                        <div className="message-avatar user-avatar">{message.avatar}</div>
+                      )}
+                      <div className={`message-content ${!message.isOwn && !showAvatar ? 'no-avatar' : ''}`}>
+                        {showAvatar && (
+                          <div className="message-header">
+                            <span className="sender-name">{message.sender}</span>
+                            <span className="message-time">{message.time}</span>
+                          </div>
+                        )}
+                        <div className="message-text">{message.content}</div>
+                        {!showAvatar && (
+                          <div className="message-time-inline">{message.time}</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {/* メッセージリストの最下部参照用 */}
+                <div ref={messagesEndRef} />
+              </>
             )}
           </div>
         </div>
 
         {/* メッセージ入力 */}
-        {selectedSpace !== "ホーム" && (
+        {selectedSpace !== "ホーム" && selectedRoomId && (
           <div className="message-input-area">
             <div className="input-container">
-              <button className="attach-btn" title="ファイル添付"></button>
+              <button className="attach-btn" title="ファイル添付">📎</button>
               <textarea
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
@@ -804,18 +1101,31 @@ function ChatScreen({ user, onSignOut }) {
                 placeholder={`${selectedSpace}にメッセージを送信`}
                 className="message-input"
                 rows="1"
+                disabled={isSendingMessage}
               />
               <div className="input-actions">
-                <button className="icon-btn emoji-btn" title="絵文字"></button>
+                <button className="icon-btn emoji-btn" title="絵文字">😊</button>
                 <button 
                   onClick={sendMessage} 
-                  className={`send-btn ${newMessage.trim() ? 'active' : ''}`}
-                  disabled={!newMessage.trim()}
-                  title="送信"
+                  className={`send-btn ${newMessage.trim() && !isSendingMessage ? 'active' : ''}`}
+                  disabled={!newMessage.trim() || isSendingMessage}
+                  title={isSendingMessage ? "送信中..." : "送信"}
                 >
+                  {isSendingMessage ? (
+                    <span className="loading-spinner-small"></span>
+                  ) : (
+                    "📤"
+                  )}
                 </button>
               </div>
             </div>
+            
+            {/* 送信状態表示 */}
+            {isSendingMessage && (
+              <div className="sending-indicator">
+                メッセージを送信中...
+              </div>
+            )}
           </div>
         )}
       </div>
