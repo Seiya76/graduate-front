@@ -24,15 +24,129 @@ import {
   getRoomMessages
 } from './graphql/queries';
 
-// import { 
-//   onRoomUpdate,
-//   onNewMessage,
-//   onMessageDeleted
-// } from './graphql/subscriptions';
-
 Amplify.configure(config);
 
 const client = generateClient();
+
+// Event API設定 - aws-exports.jsから取得
+const EVENT_API_CONFIG = {
+  httpEndpoint: config.API.Events.endpoint.replace('https://', '').replace('/event', ''),
+  realtimeEndpoint: config.API.Events.endpoint.replace('https://', '').replace('/event', '').replace('appsync-api', 'appsync-realtime-api'),
+  apiKey: config.API.Events.apiKey
+};
+
+// Event API WebSocket接続クラス
+class EventAPISubscriber {
+  constructor(httpEndpoint, realtimeEndpoint, apiKey) {
+    this.httpEndpoint = httpEndpoint;
+    this.realtimeEndpoint = realtimeEndpoint;
+    this.apiKey = apiKey;
+    this.ws = null;
+    this.messageHandlers = [];
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 5;
+    this.reconnectInterval = 1000;
+    this.isConnected = false;
+  }
+  
+  connect() {
+    try {
+      const headerInfo = {
+        host: this.httpEndpoint,
+        "x-api-key": this.apiKey,
+      };
+      
+      const encodedHeaderInfo = btoa(JSON.stringify(headerInfo))
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
+      
+      this.ws = new WebSocket(
+        `wss://${this.realtimeEndpoint}/event/realtime`,
+        ["aws-appsync-event-ws", `header-${encodedHeaderInfo}`]
+      );
+      
+      this.ws.onopen = () => {
+        console.log("Event API WebSocket connection opened");
+        this.isConnected = true;
+        this.reconnectAttempts = 0;
+        
+        // チャネルにサブスクライブ
+        const subscribeMessage = {
+          "type": "subscribe",
+          "id": this.generateUUID(),
+          "channel": "/default/channel",
+          "authorization": {
+            "host": this.httpEndpoint,
+            "x-api-key": this.apiKey,
+          }
+        };
+        
+        console.log("Sending subscribe message:", subscribeMessage);
+        this.ws.send(JSON.stringify(subscribeMessage));
+      };
+      
+      this.ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log("Event API message received:", data);
+          
+          this.messageHandlers.forEach(handler => {
+            try {
+              handler(data);
+            } catch (err) {
+              console.error("Message handler error:", err);
+            }
+          });
+        } catch (err) {
+          console.error("Error parsing WebSocket message:", err);
+        }
+      };
+      
+      this.ws.onerror = (error) => {
+        console.error("Event API WebSocket error:", error);
+        this.isConnected = false;
+      };
+      
+      this.ws.onclose = (event) => {
+        console.log("Event API WebSocket connection closed:", event);
+        this.isConnected = false;
+        
+        // 自動再接続
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+          setTimeout(() => {
+            console.log(`Attempting to reconnect... (${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`);
+            this.reconnectAttempts++;
+            this.connect();
+          }, this.reconnectInterval * Math.pow(2, this.reconnectAttempts));
+        }
+      };
+      
+    } catch (error) {
+      console.error("Error connecting to Event API:", error);
+    }
+  }
+  
+  onMessage(handler) {
+    this.messageHandlers.push(handler);
+  }
+  
+  disconnect() {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+      this.isConnected = false;
+    }
+  }
+  
+  generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+}
 
 // getUserByEmailクエリが不足している場合は追加定義
 const GET_USER_BY_EMAIL = `
@@ -80,8 +194,12 @@ function ChatScreen({ user, onSignOut }) {
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [nextToken, setNextToken] = useState(null);
 
+  // Event API用のstate
+  const [isEventApiConnected, setIsEventApiConnected] = useState(false);
+  const [eventApiError, setEventApiError] = useState(null);
+
   // リアルタイム機能用のref
-  const subscriptionsRef = useRef([]);
+  const eventSubscriberRef = useRef(null);
   const messagesEndRef = useRef(null);
 
   // 選択されたルームのID取得
@@ -103,6 +221,112 @@ function ChatScreen({ user, onSignOut }) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, 100);
   }, []);
+
+  // Event API接続の初期化
+  useEffect(() => {
+    if (!currentUser?.userId) return;
+
+    console.log("Initializing Event API connection...");
+    const subscriber = new EventAPISubscriber(
+      EVENT_API_CONFIG.httpEndpoint,
+      EVENT_API_CONFIG.realtimeEndpoint,
+      EVENT_API_CONFIG.apiKey
+    );
+
+    eventSubscriberRef.current = subscriber;
+
+    subscriber.onMessage((data) => {
+      console.log("Event API data received:", data);
+      
+      switch (data.type) {
+        case "connection_ack":
+          console.log("Event API WebSocket connection established");
+          setIsEventApiConnected(true);
+          setEventApiError(null);
+          break;
+          
+        case "subscribe_success":
+          console.log("Event API subscription successful");
+          break;
+          
+        case "data":
+          try {
+            const eventData = JSON.parse(data.event);
+            console.log("Parsed event data:", eventData);
+            
+            // メッセージイベントの処理
+            if (eventData.id && eventData.roomId && eventData.content) {
+              // 現在表示中のルームのメッセージのみ処理
+              if (eventData.roomId === selectedRoomId) {
+                const newMessage = {
+                  id: eventData.id,
+                  messageId: eventData.id,
+                  sender: eventData.user?.nickname || eventData.user?.email || '不明なユーザー',
+                  content: eventData.content,
+                  time: new Date(eventData.createdAt).toLocaleTimeString('ja-JP', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  }),
+                  isOwn: eventData.userId === currentUser?.userId,
+                  avatar: (eventData.user?.nickname || eventData.user?.email || 'UN').substring(0, 2).toUpperCase(),
+                  userId: eventData.userId,
+                  createdAt: eventData.createdAt
+                };
+                
+                setMessages(prevMessages => {
+                  // 重複チェック
+                  const exists = prevMessages.some(msg => msg.messageId === newMessage.messageId);
+                  if (exists) return prevMessages;
+                  
+                  // 新しいメッセージを追加
+                  const updatedMessages = [...prevMessages, newMessage];
+                  
+                  // 自動スクロール（自分のメッセージまたは新規メッセージの場合）
+                  if (newMessage.isOwn) {
+                    setTimeout(() => scrollToBottom(), 100);
+                  }
+                  
+                  return updatedMessages;
+                });
+              }
+              
+              // ルーム一覧の lastMessage を更新
+              setUserRooms(prevRooms => 
+                prevRooms.map(room => 
+                  room.roomId === eventData.roomId 
+                    ? { 
+                        ...room, 
+                        lastMessage: eventData.content.substring(0, 50),
+                        lastMessageAt: eventData.createdAt 
+                      }
+                    : room
+                )
+              );
+            }
+          } catch (error) {
+            console.error("Error processing event data:", error);
+          }
+          break;
+          
+        case "ka":
+          // Keep-alive メッセージ
+          console.log("Event API keep-alive received");
+          break;
+          
+        default:
+          console.log("Unknown Event API message type:", data.type);
+          break;
+      }
+    });
+
+    subscriber.connect();
+
+    return () => {
+      console.log("Cleaning up Event API connection");
+      subscriber.disconnect();
+      setIsEventApiConnected(false);
+    };
+  }, [currentUser?.userId, selectedRoomId, scrollToBottom]);
 
   // AppSyncからユーザー情報を取得
   useEffect(() => {
@@ -288,6 +512,26 @@ function ChatScreen({ user, onSignOut }) {
     setIsSendingMessage(true);
     setMessageError(null);
     
+    // 楽観的UI更新（即座に画面に表示）
+    const tempMessage = {
+      id: 'temp-' + Date.now(),
+      messageId: 'temp-' + Date.now(),
+      sender: currentUser.nickname || currentUser.email || '自分',
+      content: messageContent,
+      time: new Date().toLocaleTimeString('ja-JP', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      }),
+      isOwn: true,
+      avatar: (currentUser.nickname || currentUser.email || 'ME').substring(0, 2).toUpperCase(),
+      userId: currentUser.userId,
+      createdAt: new Date().toISOString(),
+      isOptimistic: true // 楽観的更新のフラグ
+    };
+    
+    setMessages(prevMessages => [...prevMessages, tempMessage]);
+    scrollToBottom();
+    
     try {
       console.log('Sending message to room:', selectedRoomId);
       const result = await client.graphql({
@@ -305,8 +549,20 @@ function ChatScreen({ user, onSignOut }) {
       
       console.log('メッセージ送信成功:', result.data?.sendMessage);
       
+      // 楽観的更新メッセージを削除（Event APIから正式な通知が来るため）
+      setTimeout(() => {
+        setMessages(prevMessages => 
+          prevMessages.filter(msg => msg.messageId !== tempMessage.messageId)
+        );
+      }, 2000);
+      
     } catch (err) {
       console.error('メッセージ送信エラー:', err);
+      
+      // エラー時は楽観的更新を取り消し
+      setMessages(prevMessages => 
+        prevMessages.filter(msg => msg.messageId !== tempMessage.messageId)
+      );
       
       let errorMessage = 'メッセージの送信に失敗しました';
       if (err.errors && err.errors.length > 0) {
@@ -321,7 +577,7 @@ function ChatScreen({ user, onSignOut }) {
     } finally {
       setIsSendingMessage(false);
     }
-  }, [newMessage, selectedRoomId, currentUser, isSendingMessage]);
+  }, [newMessage, selectedRoomId, currentUser, isSendingMessage, scrollToBottom]);
 
   // キーボードイベントハンドラー
   const handleKeyPress = useCallback((e) => {
@@ -336,127 +592,6 @@ function ChatScreen({ user, onSignOut }) {
     if (!hasMoreMessages || isLoadingMessages || !selectedRoomId) return;
     fetchMessages(selectedRoomId, true);
   }, [hasMoreMessages, isLoadingMessages, selectedRoomId, fetchMessages]);
-
-  // サブスクリプション設定
-  useEffect(() => {
-    if (!selectedRoomId) {
-      // サブスクリプションをクリーンアップ
-      subscriptionsRef.current.forEach(sub => {
-        try {
-          if (sub && typeof sub.unsubscribe === 'function') {
-            sub.unsubscribe();
-          }
-        } catch (err) {
-          console.warn('サブスクリプションのクリーンアップエラー:', err);
-        }
-      });
-      subscriptionsRef.current = [];
-      return;
-    }
-
-    // 既存のサブスクリプションをクリーンアップ
-    subscriptionsRef.current.forEach(sub => {
-      try {
-        if (sub && typeof sub.unsubscribe === 'function') {
-          sub.unsubscribe();
-        }
-      } catch (err) {
-        console.warn('サブスクリプションのクリーンアップエラー:', err);
-      }
-    });
-    subscriptionsRef.current = [];
-
-    // 新しいメッセージのサブスクリプション
-    const setupSubscriptions = async () => {
-      try {
-        console.log('Setting up subscriptions for room:', selectedRoomId);
-        
-        // 新しいメッセージサブスクリプション
-        // const newMessageSub = client.graphql({
-        //   query: onNewMessage,
-        //   variables: { roomId: selectedRoomId },
-        //   authMode: 'apiKey'
-        // }).subscribe({
-        //   next: (response) => {
-        //     console.log('新しいメッセージを受信:', response);
-        //     const newMsg = response.data?.onNewMessage;
-        //     if (newMsg) {
-        //       const formattedMessage = {
-        //         id: newMsg.messageId,
-        //         messageId: newMsg.messageId,
-        //         sender: newMsg.user?.nickname || newMsg.user?.email || '不明なユーザー',
-        //         content: newMsg.content,
-        //         time: new Date(newMsg.createdAt).toLocaleTimeString('ja-JP', { 
-        //           hour: '2-digit', 
-        //           minute: '2-digit' 
-        //         }),
-        //         isOwn: newMsg.userId === currentUser?.userId,
-        //         avatar: (newMsg.user?.nickname || newMsg.user?.email || 'UN').substring(0, 2).toUpperCase(),
-        //         userId: newMsg.userId,
-        //         createdAt: newMsg.createdAt
-        //       };
-              
-        //       setMessages(prevMessages => {
-        //         // 重複チェック
-        //         const exists = prevMessages.some(msg => msg.messageId === formattedMessage.messageId);
-        //         if (!exists) {
-        //           scrollToBottom();
-        //           return [...prevMessages, formattedMessage];
-        //         }
-        //         return prevMessages;
-        //       });
-        //     }
-        //   },
-        //   error: (err) => {
-        //     console.error('メッセージサブスクリプションエラー:', err);
-        //     setMessageError('リアルタイム通信でエラーが発生しました');
-        //   }
-        // });
-        
-        // subscriptionsRef.current.push(newMessageSub);
-
-        // メッセージ削除サブスクリプション
-        // const deleteSub = client.graphql({
-        //   query: onMessageDeleted,
-        //   variables: { roomId: selectedRoomId },
-        //   authMode: 'apiKey'
-        // }).subscribe({
-        //   next: (response) => {
-        //     console.log('メッセージ削除を受信:', response);
-        //     const deletedMsg = response.data?.onMessageDeleted;
-        //     if (deletedMsg && deletedMsg.success) {
-        //       setMessages(prevMessages => 
-        //         prevMessages.filter(msg => msg.messageId !== deletedMsg.messageId)
-        //       );
-        //     }
-        //   },
-        //   error: (err) => {
-        //     console.error('削除サブスクリプションエラー:', err);
-        //   }
-        // });
-        
-        // subscriptionsRef.current.push(deleteSub);
-        
-      } catch (err) {
-        console.error('サブスクリプション設定エラー:', err);
-      }
-    };
-
-    setupSubscriptions();
-
-    return () => {
-      subscriptionsRef.current.forEach(sub => {
-        try {
-          if (sub && typeof sub.unsubscribe === 'function') {
-            sub.unsubscribe();
-          }
-        } catch (err) {
-          console.warn('サブスクリプションのクリーンアップエラー:', err);
-        }
-      });
-      subscriptionsRef.current = [];
-    };
-  }, [selectedRoomId, currentUser?.userId, scrollToBottom]);
 
   // ルーム変更時にメッセージを取得
   useEffect(() => {
@@ -711,6 +846,22 @@ function ChatScreen({ user, onSignOut }) {
             <button className="icon-btn search-btn" title="検索"></button>
             <button className="icon-btn signout-btn" onClick={onSignOut} title="サインアウト"></button>
           </div>
+        </div>
+
+        {/* Event API接続状態 */}
+        <div className="connection-status">
+          <div className={`connection-indicator ${isEventApiConnected ? 'connected' : 'disconnected'}`}>
+            <span className={`status-dot ${isEventApiConnected ? 'online' : 'offline'}`}></span>
+            <span className="status-text">
+              {isEventApiConnected ? 'リアルタイム接続中' : 'オフライン'}
+            </span>
+          </div>
+          {eventApiError && (
+            <div className="connection-error">
+              <span className="error-icon">⚠️</span>
+              <span className="error-text">接続エラー</span>
+            </div>
+          )}
         </div>
 
         {/* 新しいチャット */}
@@ -1026,8 +1177,8 @@ function ChatScreen({ user, onSignOut }) {
                     <span>ダイレクトメッセージ</span>
                   </div>
                   <div className="stat-item">
-                    <strong>{modalSearchResults.length}</strong>
-                    <span>検索結果のユーザー</span>
+                    <strong>{isEventApiConnected ? '接続中' : '切断中'}</strong>
+                    <span>リアルタイム通信</span>
                   </div>
                 </div>
               </div>
@@ -1062,7 +1213,7 @@ function ChatScreen({ user, onSignOut }) {
                   return (
                     <div 
                       key={message.messageId || message.id} 
-                      className={`message-item ${message.isOwn ? 'own-message' : ''} ${isLastFromUser ? 'last-from-user' : ''}`}
+                      className={`message-item ${message.isOwn ? 'own-message' : ''} ${isLastFromUser ? 'last-from-user' : ''} ${message.isOptimistic ? 'optimistic' : ''}`}
                     >
                       {!message.isOwn && showAvatar && (
                         <div className="message-avatar user-avatar">{message.avatar}</div>
@@ -1077,6 +1228,9 @@ function ChatScreen({ user, onSignOut }) {
                         <div className="message-text">{message.content}</div>
                         {!showAvatar && (
                           <div className="message-time-inline">{message.time}</div>
+                        )}
+                        {message.isOptimistic && (
+                          <div className="message-status">送信中...</div>
                         )}
                       </div>
                     </div>
@@ -1125,6 +1279,13 @@ function ChatScreen({ user, onSignOut }) {
             {isSendingMessage && (
               <div className="sending-indicator">
                 メッセージを送信中...
+              </div>
+            )}
+            
+            {/* リアルタイム接続状態表示 */}
+            {!isEventApiConnected && (
+              <div className="connection-warning">
+                リアルタイム通信が切断されています。メッセージは送信できますが、リアルタイム更新が受信できません。
               </div>
             )}
           </div>
