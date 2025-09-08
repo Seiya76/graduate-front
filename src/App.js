@@ -28,12 +28,15 @@ Amplify.configure(config);
 
 const client = generateClient();
 
-// Event API設定 - aws-exports.jsから取得
+// Event API設定 - 直接指定（デバッグ用）
 const EVENT_API_CONFIG = {
-  httpEndpoint: config.API.Events.endpoint.replace('https://', '').replace('/event', ''),
-  realtimeEndpoint: config.API.Events.endpoint.replace('https://', '').replace('/event', '').replace('appsync-api', 'appsync-realtime-api'),
-  apiKey: config.API.Events.apiKey
+  httpEndpoint: '66lku7arcfg6nnekcrhd2rrmdi.appsync-api.ap-northeast-1.amazonaws.com',
+  realtimeEndpoint: '66lku7arcfg6nnekcrhd2rrmdi.appsync-realtime-api.ap-northeast-1.amazonaws.com',
+  apiKey: 'da2-lkibi63orzdgvk4a4wgd22j4zm'
 };
+
+// デバッグ用：設定値をコンソールに出力
+console.log('Event API Config:', EVENT_API_CONFIG);
 
 // Event API WebSocket接続クラス
 class EventAPISubscriber {
