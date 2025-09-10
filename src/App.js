@@ -423,10 +423,9 @@ function ChatScreen({ user, onSignOut }) {
     setMessageError(null);
     
     // 楽観的UI更新（即座に画面に表示）
-    const tempMessageId = 'temp-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
     const tempMessage = {
-      id: tempMessageId,
-      messageId: tempMessageId,
+      id: 'temp-' + Date.now(),
+      messageId: 'temp-' + Date.now(),
       sender: currentUser.nickname || currentUser.email || '自分',
       content: messageContent,
       time: new Date().toLocaleTimeString('ja-JP', { 
@@ -466,8 +465,12 @@ function ChatScreen({ user, onSignOut }) {
       
       console.log('メッセージ送信成功:', result.data?.sendMessage);
       
-      // 楽観的更新メッセージは Event API通知受信時に削除される
-      // （handleEventMessage内で isOptimistic フラグのメッセージを削除）
+      // 楽観的更新メッセージを削除（Event APIから正式な通知が来るため）
+      setTimeout(() => {
+        setMessages(prevMessages => 
+          prevMessages.filter(msg => msg.messageId !== tempMessage.messageId)
+        );
+      }, 2000);
       
     } catch (err) {
       console.error('メッセージ送信エラー:', err);
