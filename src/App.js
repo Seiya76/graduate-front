@@ -28,128 +28,15 @@ Amplify.configure(config);
 
 const client = generateClient();
 
-// Event API設定 - 直接指定（デバッグ用）
+// Event API設定 - aws-exports.jsから取得
 const EVENT_API_CONFIG = {
-  httpEndpoint: '66lku7arcfg6nnekcrhd2rrmdi.appsync-api.ap-northeast-1.amazonaws.com',
-  realtimeEndpoint: '66lku7arcfg6nnekcrhd2rrmdi.appsync-realtime-api.ap-northeast-1.amazonaws.com',
-  apiKey: 'da2-lkibi63orzdgvk4a4wgd22j4zm'
+  httpEndpoint: config.API.Events.endpoint.replace('https://', '').replace('/event', ''),
+  realtimeEndpoint: config.API.Events.endpoint.replace('https://', '').replace('/event', '').replace('appsync-api', 'appsync-realtime-api'),
+  apiKey: config.API.Events.apiKey
 };
 
 // デバッグ用：設定値をコンソールに出力
 console.log('Event API Config:', EVENT_API_CONFIG);
-
-// Event API WebSocket接続クラス
-class EventAPISubscriber {
-  constructor(httpEndpoint, realtimeEndpoint, apiKey) {
-    this.httpEndpoint = httpEndpoint;
-    this.realtimeEndpoint = realtimeEndpoint;
-    this.apiKey = apiKey;
-    this.ws = null;
-    this.messageHandlers = [];
-    this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 5;
-    this.reconnectInterval = 1000;
-    this.isConnected = false;
-  }
-  
-  connect() {
-    try {
-      const headerInfo = {
-        host: this.httpEndpoint,
-        "x-api-key": this.apiKey,
-      };
-      
-      const encodedHeaderInfo = btoa(JSON.stringify(headerInfo))
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/, "");
-      
-      this.ws = new WebSocket(
-        `wss://${this.realtimeEndpoint}/event/realtime`,
-        ["aws-appsync-event-ws", `header-${encodedHeaderInfo}`]
-      );
-      
-      this.ws.onopen = () => {
-        console.log("Event API WebSocket connection opened");
-        this.isConnected = true;
-        this.reconnectAttempts = 0;
-        
-        // チャネルにサブスクライブ
-        const subscribeMessage = {
-          "type": "subscribe",
-          "id": this.generateUUID(),
-          "channel": "/default/channel",
-          "authorization": {
-            "host": this.httpEndpoint,
-            "x-api-key": this.apiKey,
-          }
-        };
-        
-        console.log("Sending subscribe message:", subscribeMessage);
-        this.ws.send(JSON.stringify(subscribeMessage));
-      };
-      
-      this.ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          console.log("Event API message received:", data);
-          
-          this.messageHandlers.forEach(handler => {
-            try {
-              handler(data);
-            } catch (err) {
-              console.error("Message handler error:", err);
-            }
-          });
-        } catch (err) {
-          console.error("Error parsing WebSocket message:", err);
-        }
-      };
-      
-      this.ws.onerror = (error) => {
-        console.error("Event API WebSocket error:", error);
-        this.isConnected = false;
-      };
-      
-      this.ws.onclose = (event) => {
-        console.log("Event API WebSocket connection closed:", event);
-        this.isConnected = false;
-        
-        // 自動再接続
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-          setTimeout(() => {
-            console.log(`Attempting to reconnect... (${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`);
-            this.reconnectAttempts++;
-            this.connect();
-          }, this.reconnectInterval * Math.pow(2, this.reconnectAttempts));
-        }
-      };
-      
-    } catch (error) {
-      console.error("Error connecting to Event API:", error);
-    }
-  }
-  
-  onMessage(handler) {
-    this.messageHandlers.push(handler);
-  }
-  
-  disconnect() {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-      this.isConnected = false;
-    }
-  }
-  
-  generateUUID() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-      const r = Math.random() * 16 | 0;
-      const v = c === 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
-  }
-}
 
 // getUserByEmailクエリが不足している場合は追加定義
 const GET_USER_BY_EMAIL = `
@@ -201,8 +88,8 @@ function ChatScreen({ user, onSignOut }) {
   const [isEventApiConnected, setIsEventApiConnected] = useState(false);
   const [eventApiError, setEventApiError] = useState(null);
 
-  // リアルタイム機能用のref
-  const eventSubscriberRef = useRef(null);
+  // Amplify Events API用のref
+  const eventsChannelRef = useRef(null);
   const messagesEndRef = useRef(null);
 
   // 選択されたルームのID取得
@@ -218,128 +105,125 @@ function ChatScreen({ user, onSignOut }) {
     return null;
   }, [selectedSpace, userRooms]);
 
-  // メッセージリストの最下部にスクロール
-  const scrollToBottom = useCallback(() => {
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
-  }, []);
-
-  // Event API接続の初期化
+  // Amplify Events API接続の初期化
   useEffect(() => {
     if (!currentUser?.userId) return;
 
-    console.log("Initializing Event API connection...");
-    const subscriber = new EventAPISubscriber(
-      EVENT_API_CONFIG.httpEndpoint,
-      EVENT_API_CONFIG.realtimeEndpoint,
-      EVENT_API_CONFIG.apiKey,
-      (isConnected) => {
-        setIsEventApiConnected(isConnected);
-        if (!isConnected) {
-          setEventApiError("接続が切断されました");
-        } else {
-          setEventApiError(null);
-        }
-      }
-    );
-
-    eventSubscriberRef.current = subscriber;
-
-    subscriber.onMessage((data) => {
-      console.log("Event API data received:", data);
-      
-      switch (data.type) {
-        case "connection_ack":
-          console.log("Event API WebSocket connection established");
-          setIsEventApiConnected(true);
-          setEventApiError(null);
-          break;
-          
-        case "subscribe_success":
-          console.log("Event API subscription successful");
-          break;
-          
-        case "data":
-          try {
-            const eventData = JSON.parse(data.event);
-            console.log("Parsed event data:", eventData);
-            
-            // メッセージイベントの処理
-            if (eventData.id && eventData.roomId && eventData.content) {
-              // 現在表示中のルームのメッセージのみ処理
-              if (eventData.roomId === selectedRoomId) {
-                const newMessage = {
-                  id: eventData.id,
-                  messageId: eventData.id,
-                  sender: eventData.user?.nickname || eventData.user?.email || '不明なユーザー',
-                  content: eventData.content,
-                  time: new Date(eventData.createdAt).toLocaleTimeString('ja-JP', { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                  }),
-                  isOwn: eventData.userId === currentUser?.userId,
-                  avatar: (eventData.user?.nickname || eventData.user?.email || 'UN').substring(0, 2).toUpperCase(),
-                  userId: eventData.userId,
-                  createdAt: eventData.createdAt
-                };
-                
-                setMessages(prevMessages => {
-                  // 重複チェック
-                  const exists = prevMessages.some(msg => msg.messageId === newMessage.messageId);
-                  if (exists) return prevMessages;
-                  
-                  // 新しいメッセージを追加
-                  const updatedMessages = [...prevMessages, newMessage];
-                  
-                  // 自動スクロール（自分のメッセージまたは新規メッセージの場合）
-                  if (newMessage.isOwn) {
-                    setTimeout(() => {
-                      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-                    }, 100);
-                  }
-                  
-                  return updatedMessages;
-                });
-              }
-              
-              // ルーム一覧の lastMessage を更新
-              setUserRooms(prevRooms => 
-                prevRooms.map(room => 
-                  room.roomId === eventData.roomId 
-                    ? { 
-                        ...room, 
-                        lastMessage: eventData.content.substring(0, 50),
-                        lastMessageAt: eventData.createdAt 
-                      }
-                    : room
-                )
-              );
-            }
-          } catch (error) {
-            console.error("Error processing event data:", error);
+    console.log("Initializing Amplify Events API connection...");
+    
+    const initializeEventsConnection = async () => {
+      try {
+        // Amplify Events APIに接続
+        console.log("Connecting to channel: /default/channel");
+        const channel = await events.connect('/default/channel');
+        eventsChannelRef.current = channel;
+        
+        console.log("Events channel connected successfully");
+        setIsEventApiConnected(true);
+        setEventApiError(null);
+        
+        // メッセージを購読
+        const subscription = channel.subscribe({
+          next: (data) => {
+            console.log("Event received via Amplify Events:", data);
+            handleEventMessage(data);
+          },
+          error: (err) => {
+            console.error("Amplify Events subscription error:", err);
+            setEventApiError("購読エラーが発生しました");
+            setIsEventApiConnected(false);
           }
-          break;
-          
-        case "ka":
-          // Keep-alive メッセージ
-          console.log("Event API keep-alive received");
-          break;
-          
-        default:
-          console.log("Unknown Event API message type:", data.type);
-          break;
+        });
+        
+        console.log("Events subscription established");
+        
+        return () => {
+          console.log("Cleaning up Amplify Events subscription");
+          subscription.unsubscribe();
+          setIsEventApiConnected(false);
+        };
+        
+      } catch (error) {
+        console.error("Failed to initialize Events API:", error);
+        setEventApiError("接続に失敗しました");
+        setIsEventApiConnected(false);
       }
-    });
-
-    subscriber.connect();
+    };
+    
+    initializeEventsConnection();
 
     return () => {
-      console.log("Cleaning up Event API connection");
-      subscriber.disconnect();
+      console.log("Component unmounting - cleaning up Events API connection");
+      if (eventsChannelRef.current) {
+        eventsChannelRef.current.close?.();
+      }
       setIsEventApiConnected(false);
     };
-  }, [currentUser?.userId, selectedRoomId, scrollToBottom]);
+  }, [currentUser?.userId]);
+
+  // Event メッセージ処理
+  const handleEventMessage = (eventData) => {
+    console.log("Processing event data:", eventData);
+    
+    // メッセージイベントの処理
+    if (eventData.id && eventData.roomId && eventData.content) {
+      const newMessage = {
+        id: eventData.id,
+        messageId: eventData.id,
+        sender: eventData.user?.nickname || eventData.user?.email || '不明なユーザー',
+        content: eventData.content,
+        time: new Date(eventData.createdAt).toLocaleTimeString('ja-JP', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        }),
+        isOwn: eventData.userId === currentUser?.userId,
+        avatar: (eventData.user?.nickname || eventData.user?.email || 'UN').substring(0, 2).toUpperCase(),
+        userId: eventData.userId,
+        createdAt: eventData.createdAt
+      };
+      
+      // 現在表示中のルームのメッセージのみ画面に追加
+      setMessages(prevMessages => {
+        const currentSpace = selectedSpace;
+        if (currentSpace === "ホーム") return prevMessages;
+        
+        const currentRoom = userRooms.find(room => room.roomName === currentSpace);
+        const currentRoomId = currentRoom?.roomId;
+        
+        if (eventData.roomId === currentRoomId) {
+          // 重複チェック
+          const exists = prevMessages.some(msg => msg.messageId === newMessage.messageId);
+          if (exists) return prevMessages;
+          
+          // 新しいメッセージを追加
+          const updatedMessages = [...prevMessages, newMessage];
+          
+          // 自動スクロール（自分のメッセージまたは新規メッセージの場合）
+          if (newMessage.isOwn) {
+            setTimeout(() => {
+              messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            }, 100);
+          }
+          
+          return updatedMessages;
+        }
+        return prevMessages;
+      });
+      
+      // ルーム一覧の lastMessage を更新
+      setUserRooms(prevRooms => 
+        prevRooms.map(room => 
+          room.roomId === eventData.roomId 
+            ? { 
+                ...room, 
+                lastMessage: eventData.content.substring(0, 50),
+                lastMessageAt: eventData.createdAt 
+              }
+            : room
+        )
+      );
+    }
+  };
 
   // AppSyncからユーザー情報を取得
   useEffect(() => {
@@ -448,8 +332,8 @@ function ChatScreen({ user, onSignOut }) {
     }
   }, [currentUser]);
 
-  // メッセージ取得
-  const fetchMessages = useCallback(async (roomId, isLoadMore = false) => {
+  // メッセージ取得（依存関係を最小化）
+  const fetchMessages = async (roomId, isLoadMore = false) => {
     if (!roomId) return;
     
     if (!isLoadMore) {
@@ -493,7 +377,10 @@ function ChatScreen({ user, onSignOut }) {
         } else {
           setMessages(fetchedMessages);
           if (fetchedMessages.length > 0) {
-            scrollToBottom();
+            // スクロールを直接実行
+            setTimeout(() => {
+              messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            }, 100);
           }
         }
         
@@ -506,7 +393,17 @@ function ChatScreen({ user, onSignOut }) {
     } finally {
       setIsLoadingMessages(false);
     }
-  }, [currentUser?.userId, nextToken, scrollToBottom]);
+  };
+
+  // ルーム変更時のメッセージ取得（Event API接続とは完全に分離）
+  useEffect(() => {
+    if (selectedRoomId && currentUser?.userId) {
+      fetchMessages(selectedRoomId);
+    } else {
+      setMessages([]);
+      setMessageError(null);
+    }
+  }, [selectedRoomId, currentUser?.userId]);
 
   // メッセージ送信
   const sendMessage = useCallback(async () => {
@@ -543,10 +440,16 @@ function ChatScreen({ user, onSignOut }) {
     };
     
     setMessages(prevMessages => [...prevMessages, tempMessage]);
-    scrollToBottom();
+    
+    // スクロールを直接実行
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
     
     try {
       console.log('Sending message to room:', selectedRoomId);
+      
+      // メッセージをMessageAPIで送信（Pipeline Resolverが動作してEvent APIに通知される）
       const result = await client.graphql({
         query: sendMessageMutation,
         variables: {
@@ -590,7 +493,7 @@ function ChatScreen({ user, onSignOut }) {
     } finally {
       setIsSendingMessage(false);
     }
-  }, [newMessage, selectedRoomId, currentUser, isSendingMessage, scrollToBottom]);
+  }, [newMessage, selectedRoomId, currentUser, isSendingMessage]);
 
   // キーボードイベントハンドラー
   const handleKeyPress = useCallback((e) => {
@@ -605,16 +508,6 @@ function ChatScreen({ user, onSignOut }) {
     if (!hasMoreMessages || isLoadingMessages || !selectedRoomId) return;
     fetchMessages(selectedRoomId, true);
   };
-
-  // ルーム変更時にメッセージを取得
-  useEffect(() => {
-    if (selectedRoomId && currentUser?.userId) {
-      fetchMessages(selectedRoomId);
-    } else {
-      setMessages([]);
-      setMessageError(null);
-    }
-  }, [selectedRoomId, currentUser?.userId, fetchMessages]);
 
   // エラー自動クリア
   useEffect(() => {
@@ -872,7 +765,7 @@ function ChatScreen({ user, onSignOut }) {
           {eventApiError && (
             <div className="connection-error">
               <span className="error-icon">⚠️</span>
-              <span className="error-text">接続エラー</span>
+              <span className="error-text">{eventApiError}</span>
             </div>
           )}
         </div>
