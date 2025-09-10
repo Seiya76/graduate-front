@@ -1282,7 +1282,7 @@ function ChatScreen({ user, onSignOut }) {
                   {isSendingMessage ? (
                     <span className="loading-spinner-small"></span>
                   ) : (
-                    "📤"
+                    ""
                   )}
                 </button>
               </div>
