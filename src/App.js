@@ -294,7 +294,9 @@ function ChatScreen({ user, onSignOut }) {
                   
                   // 自動スクロール（自分のメッセージまたは新規メッセージの場合）
                   if (newMessage.isOwn) {
-                    setTimeout(() => scrollToBottom(), 100);
+                    setTimeout(() => {
+                      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+                    }, 100);
                   }
                   
                   return updatedMessages;
