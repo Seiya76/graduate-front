@@ -233,7 +233,15 @@ function ChatScreen({ user, onSignOut }) {
     const subscriber = new EventAPISubscriber(
       EVENT_API_CONFIG.httpEndpoint,
       EVENT_API_CONFIG.realtimeEndpoint,
-      EVENT_API_CONFIG.apiKey
+      EVENT_API_CONFIG.apiKey,
+      (isConnected) => {
+        setIsEventApiConnected(isConnected);
+        if (!isConnected) {
+          setEventApiError("接続が切断されました");
+        } else {
+          setEventApiError(null);
+        }
+      }
     );
 
     eventSubscriberRef.current = subscriber;
