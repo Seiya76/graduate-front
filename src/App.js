@@ -601,10 +601,10 @@ function ChatScreen({ user, onSignOut }) {
   }, [sendMessage]);
 
   // 古いメッセージを読み込む
-  const loadMoreMessages = useCallback(() => {
+  const loadMoreMessages = () => {
     if (!hasMoreMessages || isLoadingMessages || !selectedRoomId) return;
     fetchMessages(selectedRoomId, true);
-  }, [hasMoreMessages, isLoadingMessages, selectedRoomId, fetchMessages]);
+  };
 
   // ルーム変更時にメッセージを取得
   useEffect(() => {
@@ -1282,7 +1282,7 @@ function ChatScreen({ user, onSignOut }) {
                   {isSendingMessage ? (
                     <span className="loading-spinner-small"></span>
                   ) : (
-                    ""
+                    "📤"
                   )}
                 </button>
               </div>
