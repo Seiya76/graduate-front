@@ -6,7 +6,7 @@ const config = {
           endpoint: 'https://lnbqw6f7avh7ze3szmlszlhrzy.appsync-api.ap-northeast-1.amazonaws.com/graphql',
           region: 'ap-northeast-1',
           defaultAuthMode: 'apiKey',
-          apiKey: 'da2-efx6t5wz65asdmibzihjdzwbvm'
+          apiKey: 'da2-wkiiwoa5wbhflhvsx3m5qr7mxq'
         },
         // Event API設定 - 正しい値で更新
         Events: {
