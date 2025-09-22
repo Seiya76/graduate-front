@@ -8,13 +8,6 @@ const config = {
           defaultAuthMode: 'apiKey',
           apiKey: 'da2-wkiiwoa5wbhflhvsx3m5qr7mxq'
         },
-        // Event API設定 - 正しい値で更新
-        Events: {
-          endpoint: 'https://66lku7arcfg6nnekcrhd2rrmdi.appsync-api.ap-northeast-1.amazonaws.com/event',
-          region: 'ap-northeast-1',
-          defaultAuthMode: 'apiKey',
-          apiKey: 'da2-lkibi63orzdgvk4a4wgd22j4zm'
-        }
     }
 };
 

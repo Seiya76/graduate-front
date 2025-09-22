@@ -1,6 +1,19 @@
 /* eslint-disable */
 // this is an auto generated file. This will be overwritten
 
+export const sendMessage = /* GraphQL */ `
+  mutation SendMessage($input: SendMessageInput!) {
+    sendMessage(input: $input) {
+      messageId
+      roomId
+      userId
+      nickname
+      content
+      createdAt
+      __typename
+    }
+  }
+`;
 export const createGroupRoom = /* GraphQL */ `
   mutation CreateGroupRoom($input: CreateGroupRoomInput!) {
     createGroupRoom(input: $input) {
@@ -49,40 +62,6 @@ export const leaveRoom = /* GraphQL */ `
     leaveRoom(roomId: $roomId, userId: $userId) {
       roomId
       userId
-      message
-      __typename
-    }
-  }
-`;
-export const sendMessage = /* GraphQL */ `
-  mutation SendMessage($input: SendMessageInput!) {
-    sendMessage(input: $input) {
-      messageId
-      roomId
-      userId
-      content
-      messageType
-      createdAt
-      updatedAt
-      user {
-        userId
-        createdAt
-        email
-        emailVerified
-        nickname
-        status
-        updatedAt
-        __typename
-      }
-      __typename
-    }
-  }
-`;
-export const deleteMessage = /* GraphQL */ `
-  mutation DeleteMessage($messageId: ID!, $userId: ID) {
-    deleteMessage(messageId: $messageId, userId: $userId) {
-      messageId
-      success
       message
       __typename
     }

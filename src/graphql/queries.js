@@ -1,6 +1,19 @@
 /* eslint-disable */
 // this is an auto generated file. This will be overwritten
 
+export const getRecentMessages = /* GraphQL */ `
+  query GetRecentMessages($roomId: String!) {
+    getRecentMessages(roomId: $roomId) {
+      messageId
+      roomId
+      userId
+      nickname
+      content
+      createdAt
+      __typename
+    }
+  }
+`;
 export const getUserRooms = /* GraphQL */ `
   query GetUserRooms($userId: ID!, $limit: Int, $nextToken: String) {
     getUserRooms(userId: $userId, limit: $limit, nextToken: $nextToken) {
@@ -78,88 +91,6 @@ export const searchUsers = /* GraphQL */ `
         updatedAt
         __typename
       }
-      __typename
-    }
-  }
-`;
-export const getRoomMessages = /* GraphQL */ `
-  query GetRoomMessages(
-    $roomId: ID!
-    $limit: Int
-    $nextToken: String
-    $sortDirection: String
-  ) {
-    getRoomMessages(
-      roomId: $roomId
-      limit: $limit
-      nextToken: $nextToken
-      sortDirection: $sortDirection
-    ) {
-      items {
-        messageId
-        roomId
-        userId
-        content
-        messageType
-        createdAt
-        updatedAt
-        __typename
-      }
-      nextToken
-      hasMore
-      __typename
-    }
-  }
-`;
-export const getMessage = /* GraphQL */ `
-  query GetMessage($messageId: ID!) {
-    getMessage(messageId: $messageId) {
-      messageId
-      roomId
-      userId
-      content
-      messageType
-      createdAt
-      updatedAt
-      user {
-        userId
-        createdAt
-        email
-        emailVerified
-        nickname
-        status
-        updatedAt
-        __typename
-      }
-      __typename
-    }
-  }
-`;
-export const getUserMessages = /* GraphQL */ `
-  query GetUserMessages(
-    $userId: ID!
-    $limit: Int
-    $nextToken: String
-    $sortDirection: String
-  ) {
-    getUserMessages(
-      userId: $userId
-      limit: $limit
-      nextToken: $nextToken
-      sortDirection: $sortDirection
-    ) {
-      items {
-        messageId
-        roomId
-        userId
-        content
-        messageType
-        createdAt
-        updatedAt
-        __typename
-      }
-      nextToken
-      hasMore
       __typename
     }
   }
