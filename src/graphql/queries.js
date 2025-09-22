@@ -95,3 +95,22 @@ export const searchUsers = /* GraphQL */ `
     }
   }
 `;
+
+export const getRoomMessages = /* GraphQL */ `
+  query GetRoomMessages($roomId: String!, $limit: Int, $nextToken: String) {
+    getRoomMessages(roomId: $roomId, limit: $limit, nextToken: $nextToken) {
+      items {
+        messageId
+        roomId
+        userId
+        nickname
+        content
+        createdAt
+        __typename
+      }
+      nextToken
+      hasMore
+      __typename
+    }
+  }
+`;
