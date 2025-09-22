@@ -1,19 +1,6 @@
 /* eslint-disable */
 // this is an auto generated file. This will be overwritten
 
-export const getRecentMessages = /* GraphQL */ `
-  query GetRecentMessages($roomId: String!) {
-    getRecentMessages(roomId: $roomId) {
-      messageId
-      roomId
-      userId
-      nickname
-      content
-      createdAt
-      __typename
-    }
-  }
-`;
 export const getUserRooms = /* GraphQL */ `
   query GetUserRooms($userId: ID!, $limit: Int, $nextToken: String) {
     getUserRooms(userId: $userId, limit: $limit, nextToken: $nextToken) {
@@ -95,10 +82,30 @@ export const searchUsers = /* GraphQL */ `
     }
   }
 `;
-
-export const getRoomMessages = /* GraphQL */ `
-  query GetRoomMessages($roomId: String!, $limit: Int, $nextToken: String) {
-    getRoomMessages(roomId: $roomId, limit: $limit, nextToken: $nextToken) {
+export const getRecentMessages = /* GraphQL */ `
+  query GetRecentMessages($roomId: String!) {
+    getRecentMessages(roomId: $roomId) {
+      messageId
+      roomId
+      userId
+      nickname
+      content
+      createdAt
+      __typename
+    }
+  }
+`;
+export const getMessagesPaginated = /* GraphQL */ `
+  query GetMessagesPaginated(
+    $roomId: String!
+    $limit: Int
+    $nextToken: String
+  ) {
+    getMessagesPaginated(
+      roomId: $roomId
+      limit: $limit
+      nextToken: $nextToken
+    ) {
       items {
         messageId
         roomId
@@ -109,7 +116,6 @@ export const getRoomMessages = /* GraphQL */ `
         __typename
       }
       nextToken
-      hasMore
       __typename
     }
   }
