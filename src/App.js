@@ -126,32 +126,75 @@ class MessageHistoryManager {
     try {
       console.log('Loading initial messages for room:', this.roomId);
       
-      const result = await this.client.graphql({
-        query: getMessagesPaginated,
-        variables: { 
-          roomId: this.roomId,
-          limit: limit
-        },
-        authMode: 'apiKey'
-      });
+      // まずgetRecentMessagesを試す（元のコードで動いていた方法）
+      let result;
+      let fetchedMessages = [];
       
-      if (result.data?.getMessagesPaginated) {
-        const fetchedMessages = result.data.getMessagesPaginated.items.map(msg => 
-          this.formatMessage(msg)
-        );
+      try {
+        result = await this.client.graphql({
+          query: getRecentMessages,
+          variables: { roomId: this.roomId },
+          authMode: 'apiKey'
+        });
         
+        if (result.data?.getRecentMessages) {
+          fetchedMessages = result.data.getRecentMessages.map(msg => this.formatMessage(msg));
+          // getRecentMessagesはページネーション非対応なので、最初の読み込みのみ
+          this.hasMoreMessages = false;
+          this.oldestMessageReached = true;
+          console.log(`Loaded ${fetchedMessages.length} recent messages (no pagination)`);
+        }
+      } catch (recentError) {
+        console.warn('getRecentMessages failed, trying getMessagesPaginated:', recentError);
+        
+        // getRecentMessagesが失敗した場合、getMessagesPaginatedを試す
+        try {
+          result = await this.client.graphql({
+            query: getMessagesPaginated,
+            variables: { 
+              roomId: this.roomId,
+              limit: limit
+            },
+            authMode: 'apiKey'
+          });
+          
+          if (result.data?.getMessagesPaginated) {
+            fetchedMessages = result.data.getMessagesPaginated.items.map(msg => 
+              this.formatMessage(msg)
+            );
+            
+            this.nextToken = result.data.getMessagesPaginated.nextToken;
+            this.hasMoreMessages = !!result.data.getMessagesPaginated.nextToken;
+            
+            console.log(`Loaded ${fetchedMessages.length} paginated messages`);
+          }
+        } catch (paginatedError) {
+          console.error('Both message queries failed:', {
+            recentError,
+            paginatedError
+          });
+          throw paginatedError;
+        }
+      }
+      
+      if (fetchedMessages.length > 0) {
         // メッセージを時系列順（古い→新しい）にソート
         fetchedMessages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-        
         this.messages = fetchedMessages;
-        this.nextToken = result.data.getMessagesPaginated.nextToken;
-        this.hasMoreMessages = !!result.data.getMessagesPaginated.nextToken;
-        
-        console.log(`Loaded ${fetchedMessages.length} initial messages`);
       }
+      
     } catch (err) {
       console.error('Error loading initial messages:', err);
-      throw new Error('メッセージの取得に失敗しました: ' + (err.message || 'Unknown error'));
+      
+      // より詳細なエラー情報を提供
+      let errorMessage = 'メッセージの取得に失敗しました';
+      if (err.errors && err.errors.length > 0) {
+        errorMessage += ': ' + err.errors.map(e => e.message).join(', ');
+      } else if (err.message) {
+        errorMessage += ': ' + err.message;
+      }
+      
+      throw new Error(errorMessage);
     } finally {
       this.isLoading = false;
       this.notify();
