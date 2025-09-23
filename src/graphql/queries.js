@@ -82,37 +82,19 @@ export const searchUsers = /* GraphQL */ `
     }
   }
 `;
-export const getRecentMessages = /* GraphQL */ `
-  query GetRecentMessages($roomId: String!) {
-    getRecentMessages(roomId: $roomId) {
-      messageId
-      roomId
-      userId
-      nickname
-      content
-      createdAt
-      __typename
-    }
-  }
-`;
-export const getMessagesPaginated = /* GraphQL */ `
-  query GetMessagesPaginated(
-    $roomId: String!
-    $limit: Int
-    $nextToken: String
-  ) {
-    getMessagesPaginated(
-      roomId: $roomId
-      limit: $limit
-      nextToken: $nextToken
-    ) {
+export const getMessages = /* GraphQL */ `
+  query GetMessages($roomId: String!, $limit: Int, $nextToken: String) {
+    getMessages(roomId: $roomId, limit: $limit, nextToken: $nextToken) {
       items {
         messageId
         roomId
         userId
-        nickname
         content
+        messageType
         createdAt
+        updatedAt
+        isDeleted
+        editedAt
         __typename
       }
       nextToken
