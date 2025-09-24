@@ -6,52 +6,158 @@ import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/api';
 import config from './aws-exports.js';
 
-// GraphQLクエリをインポート
-import { 
-  createGroupRoom, 
-  createDirectRoom, 
-  joinRoom,
-  sendMessage as sendMessageMutation
-} from './graphql/mutations';
-
-import { 
-  getCurrentUser,
-  getUser, 
-  searchUsers, 
-  getUserRooms, 
-  getRoom,
-  getRecentMessages
-} from './graphql/queries';
-
-import {
-  onMessageSent,
-  onRoomUpdate
-} from './graphql/subscriptions';
-
 Amplify.configure(config);
 
 const client = generateClient();
 
-// メッセージ履歴取得用のクエリを定義
-const GET_MESSAGES_PAGINATED = `
-  query GetMessagesPaginated($roomId: String!, $limit: Int, $nextToken: String) {
-    getMessagesPaginated(roomId: $roomId, limit: $limit, nextToken: $nextToken) {
-      items {
-        messageId
-        roomId
-        userId
-        nickname
-        content
-        createdAt
-        __typename
-      }
-      nextToken
-      __typename
+// GraphQL Mutations
+const CREATE_GROUP_ROOM = `
+  mutation CreateGroupRoom($input: CreateGroupRoomInput!) {
+    createGroupRoom(input: $input) {
+      roomId
+      roomName
+      roomType
+      createdBy
+      createdAt
+      memberCount
+      updatedAt
     }
   }
 `;
 
-// getUserByEmailクエリ
+const CREATE_DIRECT_ROOM = `
+  mutation CreateDirectRoom($targetUserId: ID!, $createdBy: ID!) {
+    createDirectRoom(targetUserId: $targetUserId, createdBy: $createdBy) {
+      roomId
+      roomName
+      roomType
+      createdBy
+      createdAt
+      memberCount
+      updatedAt
+    }
+  }
+`;
+
+const JOIN_ROOM = `
+  mutation JoinRoom($roomId: ID!, $userId: ID!) {
+    joinRoom(roomId: $roomId, userId: $userId) {
+      userId
+      roomId
+      joinedAt
+      role
+    }
+  }
+`;
+
+const SEND_MESSAGE = `
+  mutation SendMessage($input: SendMessageInput!) {
+    sendMessage(input: $input) {
+      messageId
+      roomId
+      userId
+      content
+      messageType
+      createdAt
+      updatedAt
+      isDeleted
+      user {
+        userId
+        nickname
+        email
+        status
+      }
+    }
+  }
+`;
+
+// GraphQL Queries
+const GET_USER_ROOMS = `
+  query GetUserRooms($userId: ID!, $limit: Int, $nextToken: String) {
+    getUserRooms(userId: $userId, limit: $limit, nextToken: $nextToken) {
+      items {
+        roomId
+        roomName
+        roomType
+        createdBy
+        createdAt
+        lastMessage
+        lastMessageAt
+        memberCount
+        updatedAt
+      }
+      nextToken
+    }
+  }
+`;
+
+const GET_USER = `
+  query GetUser($userId: ID!) {
+    getUser(userId: $userId) {
+      userId
+      createdAt
+      email
+      emailVerified
+      nickname
+      status
+      updatedAt
+    }
+  }
+`;
+
+const SEARCH_USERS = `
+  query SearchUsers($searchTerm: String!, $limit: Int) {
+    searchUsers(searchTerm: $searchTerm, limit: $limit) {
+      items {
+        userId
+        nickname
+        email
+        status
+      }
+    }
+  }
+`;
+
+const GET_ROOM = `
+  query GetRoom($roomId: ID!) {
+    getRoom(roomId: $roomId) {
+      roomId
+      roomName
+      roomType
+      createdBy
+      createdAt
+      lastMessage
+      lastMessageAt
+      memberCount
+      updatedAt
+    }
+  }
+`;
+
+const GET_MESSAGES = `
+  query GetMessages($roomId: String!, $limit: Int, $nextToken: String) {
+    getMessages(roomId: $roomId, limit: $limit, nextToken: $nextToken) {
+      items {
+        messageId
+        roomId
+        userId
+        content
+        messageType
+        createdAt
+        updatedAt
+        isDeleted
+        user {
+          userId
+          nickname
+          email
+          status
+        }
+      }
+      nextToken
+    }
+  }
+`;
+
 const GET_USER_BY_EMAIL = `
   query GetUserByEmail($email: String!) {
     getUserByEmail(email: $email) {
@@ -62,7 +168,44 @@ const GET_USER_BY_EMAIL = `
       nickname
       status
       updatedAt
-      __typename
+    }
+  }
+`;
+
+// GraphQL Subscriptions
+const ON_MESSAGE_SENT = `
+  subscription OnMessageSent($roomId: String!) {
+    onMessageSent(roomId: $roomId) {
+      messageId
+      roomId
+      userId
+      content
+      messageType
+      createdAt
+      updatedAt
+      isDeleted
+      user {
+        userId
+        nickname
+        email
+        status
+      }
+    }
+  }
+`;
+
+const ON_ROOM_UPDATE = `
+  subscription OnRoomUpdate($userId: ID!) {
+    onRoomUpdate(userId: $userId) {
+      roomId
+      roomName
+      roomType
+      createdBy
+      createdAt
+      lastMessage
+      lastMessageAt
+      memberCount
+      updatedAt
     }
   }
 `;
@@ -134,7 +277,7 @@ function ChatScreen({ user, onSignOut }) {
         // まずuserIdで検索を試す
         try {
           result = await client.graphql({
-            query: getUser,
+            query: GET_USER,
             variables: { userId: oidcSub },
             authMode: 'apiKey'
           });
@@ -204,7 +347,7 @@ function ChatScreen({ user, onSignOut }) {
       try {
         console.log('Fetching rooms for user:', currentUser.userId);
         const result = await client.graphql({
-          query: getUserRooms,
+          query: GET_USER_ROOMS,
           variables: { 
             userId: currentUser.userId,
             limit: 50 
@@ -241,7 +384,7 @@ function ChatScreen({ user, onSignOut }) {
 
     try {
       messageSubscriptionRef.current = client.graphql({
-        query: onMessageSent,
+        query: ON_MESSAGE_SENT,
         variables: { roomId: selectedRoomId },
         authMode: 'apiKey'
       }).subscribe({
@@ -255,7 +398,7 @@ function ChatScreen({ user, onSignOut }) {
             const formattedMessage = {
               id: newMsg.messageId,
               messageId: newMsg.messageId,
-              sender: newMsg.nickname || '不明なユーザー',
+              sender: newMsg.user?.nickname || '不明なユーザー',
               content: newMsg.content,
               time: new Date(newMsg.createdAt).toLocaleTimeString('ja-JP', { 
                 hour: '2-digit', 
@@ -263,7 +406,7 @@ function ChatScreen({ user, onSignOut }) {
               }),
               date: new Date(newMsg.createdAt).toLocaleDateString('ja-JP'),
               isOwn: newMsg.userId === currentUser.userId,
-              avatar: (newMsg.nickname || 'UN').substring(0, 2).toUpperCase(),
+              avatar: (newMsg.user?.nickname || 'UN').substring(0, 2).toUpperCase(),
               userId: newMsg.userId,
               createdAt: newMsg.createdAt
             };
@@ -337,7 +480,7 @@ function ChatScreen({ user, onSignOut }) {
     
     try {
       roomSubscriptionRef.current = client.graphql({
-        query: onRoomUpdate,
+        query: ON_ROOM_UPDATE,
         variables: { userId: currentUser.userId },
         authMode: 'apiKey'
       }).subscribe({
@@ -381,7 +524,7 @@ function ChatScreen({ user, onSignOut }) {
   // 通知を表示
   const showNotification = (message) => {
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(`${message.nickname || '新着メッセージ'}`, {
+      new Notification(`${message.user?.nickname || '新着メッセージ'}`, {
         body: message.content,
         icon: '/chat-icon.png',
         tag: message.messageId,
@@ -410,18 +553,20 @@ function ChatScreen({ user, onSignOut }) {
     try {
       console.log('Fetching initial messages for room:', selectedRoomId);
       
-      // 最初は getRecentMessages を使用
       const result = await client.graphql({
-        query: getRecentMessages,
-        variables: { roomId: selectedRoomId },
+        query: GET_MESSAGES,
+        variables: { 
+          roomId: selectedRoomId,
+          limit: 50
+        },
         authMode: 'apiKey'
       });
       
-      if (result.data?.getRecentMessages) {
-        const fetchedMessages = result.data.getRecentMessages.map(msg => ({
+      if (result.data?.getMessages) {
+        const fetchedMessages = result.data.getMessages.items.map(msg => ({
           id: msg.messageId,
           messageId: msg.messageId,
-          sender: msg.nickname || '不明なユーザー',
+          sender: msg.user?.nickname || '不明なユーザー',
           content: msg.content,
           time: new Date(msg.createdAt).toLocaleTimeString('ja-JP', { 
             hour: '2-digit', 
@@ -429,15 +574,14 @@ function ChatScreen({ user, onSignOut }) {
           }),
           date: new Date(msg.createdAt).toLocaleDateString('ja-JP'),
           isOwn: msg.userId === currentUser?.userId,
-          avatar: (msg.nickname || 'UN').substring(0, 2).toUpperCase(),
+          avatar: (msg.user?.nickname || 'UN').substring(0, 2).toUpperCase(),
           userId: msg.userId,
           createdAt: msg.createdAt
         }));
         
         setMessages(fetchedMessages);
-        
-        // 50件取得できたら、さらに過去のメッセージがある可能性
-        setHasMoreMessages(fetchedMessages.length >= 50);
+        setMessageNextToken(result.data.getMessages.nextToken);
+        setHasMoreMessages(!!result.data.getMessages.nextToken);
         
         // 初回読み込み時は最下部にスクロール
         setTimeout(() => {
@@ -452,9 +596,9 @@ function ChatScreen({ user, onSignOut }) {
     }
   };
 
-  // 過去のメッセージを読み込む（メッセージ履歴機能）
+  // 過去のメッセージを読み込む
   const loadMoreMessages = useCallback(async () => {
-    if (!selectedRoomId || !hasMoreMessages || isLoadingMoreMessages) {
+    if (!selectedRoomId || !hasMoreMessages || isLoadingMoreMessages || !messageNextToken) {
       return;
     }
     
@@ -469,7 +613,7 @@ function ChatScreen({ user, onSignOut }) {
       console.log('Loading more messages with token:', messageNextToken);
       
       const result = await client.graphql({
-        query: GET_MESSAGES_PAGINATED,
+        query: GET_MESSAGES,
         variables: { 
           roomId: selectedRoomId,
           limit: 30,
@@ -478,13 +622,13 @@ function ChatScreen({ user, onSignOut }) {
         authMode: 'apiKey'
       });
       
-      const data = result.data?.getMessagesPaginated;
+      const data = result.data?.getMessages;
       
       if (data?.items) {
         const olderMessages = data.items.map(msg => ({
           id: msg.messageId,
           messageId: msg.messageId,
-          sender: msg.nickname || '不明なユーザー',
+          sender: msg.user?.nickname || '不明なユーザー',
           content: msg.content,
           time: new Date(msg.createdAt).toLocaleTimeString('ja-JP', { 
             hour: '2-digit', 
@@ -492,7 +636,7 @@ function ChatScreen({ user, onSignOut }) {
           }),
           date: new Date(msg.createdAt).toLocaleDateString('ja-JP'),
           isOwn: msg.userId === currentUser?.userId,
-          avatar: (msg.nickname || 'UN').substring(0, 2).toUpperCase(),
+          avatar: (msg.user?.nickname || 'UN').substring(0, 2).toUpperCase(),
           userId: msg.userId,
           createdAt: msg.createdAt
         }));
@@ -525,7 +669,7 @@ function ChatScreen({ user, onSignOut }) {
     }
   }, [selectedRoomId, hasMoreMessages, isLoadingMoreMessages, messageNextToken, currentUser]);
 
-  // スクロールイベントハンドラー（無限スクロール用）
+  // スクロールイベントハンドラー
   const handleScroll = useCallback(() => {
     if (!messagesContainerRef.current) return;
     
@@ -600,13 +744,13 @@ function ChatScreen({ user, onSignOut }) {
       console.log('Sending message to room:', selectedRoomId);
       
       const result = await client.graphql({
-        query: sendMessageMutation,
+        query: SEND_MESSAGE,
         variables: {
           input: {
             roomId: selectedRoomId,
             userId: currentUser.userId,
-            nickname: currentUser.nickname || currentUser.email || 'ユーザー',
-            content: messageContent
+            content: messageContent,
+            messageType: 'text'
           }
         },
         authMode: 'apiKey'
@@ -668,8 +812,6 @@ function ChatScreen({ user, onSignOut }) {
     }
   }, [sendMessage]);
 
-  // 以下、既存の関数（ユーザー検索、ルーム作成など）
-  
   // ユーザー検索（モーダル用）
   const searchUsersForModal = async (searchTerm) => {
     if (!searchTerm.trim()) {
@@ -680,7 +822,7 @@ function ChatScreen({ user, onSignOut }) {
     setIsModalSearching(true);
     try {
       const result = await client.graphql({
-        query: searchUsers,
+        query: SEARCH_USERS,
         variables: { 
           searchTerm: searchTerm.trim(),
           limit: 50
@@ -711,7 +853,7 @@ function ChatScreen({ user, onSignOut }) {
     setIsDmSearching(true);
     try {
       const result = await client.graphql({
-        query: searchUsers,
+        query: SEARCH_USERS,
         variables: { 
           searchTerm: searchTerm.trim(),
           limit: 20 
@@ -767,7 +909,7 @@ function ChatScreen({ user, onSignOut }) {
 
     try {
       const result = await client.graphql({
-        query: createGroupRoom,
+        query: CREATE_GROUP_ROOM,
         variables: {
           input: {
             roomName: newRoomName.trim(),
@@ -814,7 +956,7 @@ function ChatScreen({ user, onSignOut }) {
 
     try {
       const result = await client.graphql({
-        query: createDirectRoom,
+        query: CREATE_DIRECT_ROOM,
         variables: {
           targetUserId: targetUserId,
           createdBy: currentUser.userId
