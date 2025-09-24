@@ -1675,3 +1675,45 @@ body {
 .messages-list::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.3);
 }
+
+/* 受信メッセージの吹き出し（背景＋角丸） */
+.message-item:not(.own-message) .message-content {
+  background-color: #f1f3f4;      /* 受信側のバブル色 */
+  padding: 8px 12px;
+  border-radius: 18px 18px 18px 4px; /* 左にしっぽが付く想定 */
+  position: relative;               /* しっぽを出すために必要 */
+}
+
+/* 受信メッセージの「しっぽ」 */
+.message-item:not(.own-message) .message-content::before {
+  content: '';
+  position: absolute;
+  left: -6px;         /* アバター側（左）に出す */
+  bottom: 10px;
+  width: 12px;
+  height: 12px;
+  background-color: #f1f3f4;
+  transform: rotate(45deg);
+  border-bottom-left-radius: 2px;
+}
+
+/* 送信メッセージ側にも「しっぽ」を付けたい場合（任意） */
+.message-item.own-message .message-content {
+  position: relative; /* 既存の角丸はそのまま活かす */
+}
+.message-item.own-message .message-content::after {
+  content: '';
+  position: absolute;
+  right: -6px;       /* 自分側（右）に出す */
+  bottom: 10px;
+  width: 12px;
+  height: 12px;
+  background-color: #e8f0fe; /* 送信側のバブル色（既存） */
+  transform: rotate(45deg);
+  border-bottom-right-radius: 2px;
+}
+
+/* 受信メッセージのアバターと本文の間隔を少し詰める（お好みで） */
+.message-item:not(.own-message) .message-avatar {
+  margin-right: 8px;
+}

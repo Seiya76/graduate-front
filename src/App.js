@@ -1038,7 +1038,7 @@ function ChatScreen({ user, onSignOut }) {
                       key={message.messageId || message.id} 
                       className={`message-item ${message.isOwn ? 'own-message' : ''} ${isLastFromUser ? 'last-from-user' : ''} ${message.isOptimistic ? 'optimistic' : ''}`}
                     >
-                      {!message.isOwn && showAvatar && (
+                      {!message.isOwn && (
                         <div className="message-avatar user-avatar">{message.avatar}</div>
                       )}
                       <div className={`message-content ${!message.isOwn && !showAvatar ? 'no-avatar' : ''}`}>
