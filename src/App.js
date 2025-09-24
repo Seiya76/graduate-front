@@ -909,7 +909,7 @@ function ChatScreen({ user, onSignOut }) {
         <div className="nav-section">
           {/* ホーム */}
           <div className="nav-group">
-            <div className="nav-group-header">ショートカット</div>
+            <div className="nav-group-header">グループメッセージ</div>
             <div
               className={`nav-item ${
                 selectedSpace === "ホーム" ? "active" : ""
@@ -1108,22 +1108,10 @@ function ChatScreen({ user, onSignOut }) {
                     <strong>{directRooms.length}</strong>
                     <span>ダイレクトメッセージ</span>
                   </div>
-                  <div className="stat-item">
-                    <strong>{isConnected ? "接続中" : "切断中"}</strong>
-                    <span>リアルタイム通信</span>
-                  </div>
                 </div>
               </div>
             ) : (
               <>
-                {/* 初回読み込み表示 */}
-                {isLoadingMessages && messages.length === 0 && (
-                  <div className="loading-message">
-                    <div className="loading-spinner"></div>
-                    <div>メッセージを読み込み中...</div>
-                  </div>
-                )}
-
                 {/* メッセージリスト */}
                 {messages.map((message, index) => {
                   const showAvatar =
@@ -1156,14 +1144,6 @@ function ChatScreen({ user, onSignOut }) {
                     </div>
                   );
                 })}
-
-                {/* メッセージが空の場合 */}
-                {!isLoadingMessages && messages.length === 0 && (
-                  <div className="no-messages">
-                    <p>まだメッセージがありません。</p>
-                    <p>最初のメッセージを送信してみましょう！</p>
-                  </div>
-                )}
 
                 {/* メッセージリストの最下部参照用 */}
                 <div ref={messagesEndRef} />
