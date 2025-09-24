@@ -1189,9 +1189,6 @@ function ChatScreen({ user, onSignOut }) {
                 disabled={isSendingMessage}
               />
               <div className="input-actions">
-                <button className="icon-btn emoji-btn" title="絵文字">
-                  😊
-                </button>
                 <button
                   onClick={sendMessage}
                   className={`send-btn ${
@@ -1209,17 +1206,6 @@ function ChatScreen({ user, onSignOut }) {
               </div>
             </div>
 
-            {/* 送信状態表示 */}
-            {isSendingMessage && (
-              <div className="sending-indicator">メッセージを送信中...</div>
-            )}
-
-            {/* リアルタイム接続状態表示 */}
-            {!isConnected && (
-              <div className="connection-warning">
-                リアルタイム通信が切断されています。メッセージは送信できますが、リアルタイム更新が受信できません。
-              </div>
-            )}
           </div>
         )}
       </div>
