@@ -1717,3 +1717,17 @@ body {
 .message-item:not(.own-message) .message-avatar {
   margin-right: 8px;
 }
+
+/* メッセージ吹き出し内の時間を右下に配置 */
+.message-content {
+  position: relative;
+  display: inline-block;
+}
+
+.message-time-inline {
+  font-size: 11px;
+  color: #888;
+  text-align: right;
+  margin-top: 4px;
+  display: block;
+}
