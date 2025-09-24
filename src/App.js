@@ -100,9 +100,6 @@ function ChatScreen({ user, onSignOut }) {
         const oidcSub = user.profile.sub;
         const email = user.profile.email;
         
-        console.log('OIDC sub:', oidcSub);
-        console.log('OIDC email:', email);
-        
         let result = null;
         
         // まずuserIdで検索を試す
@@ -114,12 +111,11 @@ function ChatScreen({ user, onSignOut }) {
           });
           
           if (result.data.getUser) {
-            console.log('User found by userId:', result.data.getUser);
             setCurrentUser(result.data.getUser);
             return;
           }
         } catch (userIdError) {
-          console.log('User not found by userId, trying email...');
+          // userIdで見つからない場合の処理
         }
         
         // userIdで見つからない場合、emailで検索
@@ -132,17 +128,15 @@ function ChatScreen({ user, onSignOut }) {
             });
             
             if (result.data.getUserByEmail) {
-              console.log('User found by email:', result.data.getUserByEmail);
               setCurrentUser(result.data.getUserByEmail);
               return;
             }
           } catch (emailError) {
-            console.log('User not found by email either');
+            // emailでも見つからない場合の処理
           }
         }
         
         // DynamoDBにデータがない場合はOIDC情報をフォールバック
-        console.log('Using OIDC profile as fallback');
         const fallbackUser = {
           userId: oidcSub,
           nickname: user.profile.name || user.profile.preferred_username || email?.split('@')[0],
@@ -176,7 +170,6 @@ function ChatScreen({ user, onSignOut }) {
       if (!currentUser?.userId) return;
 
       try {
-        console.log('Fetching rooms for user:', currentUser.userId);
         const result = await client.graphql({
           query: getUserRooms,
           variables: { 
@@ -187,7 +180,6 @@ function ChatScreen({ user, onSignOut }) {
         });
 
         if (result.data.getUserRooms?.items) {
-          console.log('User rooms:', result.data.getUserRooms.items);
           setUserRooms(result.data.getUserRooms.items);
         }
       } catch (error) {
@@ -205,8 +197,6 @@ function ChatScreen({ user, onSignOut }) {
     if (!selectedRoomId || !currentUser?.userId) {
       return;
     }
-
-    console.log('Setting up message subscription for room:', selectedRoomId);
     
     // 既存のサブスクリプションをクリーンアップ
     if (messageSubscriptionRef.current) {
@@ -220,8 +210,6 @@ function ChatScreen({ user, onSignOut }) {
         authMode: 'apiKey'
       }).subscribe({
         next: (eventData) => {
-          console.log('Message received via subscription:', eventData);
-          
           if (eventData.value?.data?.onMessageSent) {
             const newMsg = eventData.value.data.onMessageSent;
             
@@ -274,7 +262,6 @@ function ChatScreen({ user, onSignOut }) {
           setIsConnected(false);
         },
         complete: () => {
-          console.log('Subscription connected successfully');
           setIsConnected(true);
           setConnectionError(null);
         }
@@ -298,8 +285,6 @@ function ChatScreen({ user, onSignOut }) {
   // ルーム更新のサブスクリプション
   useEffect(() => {
     if (!currentUser?.userId) return;
-
-    console.log('Setting up room update subscription');
     
     try {
       roomSubscriptionRef.current = client.graphql({
@@ -308,8 +293,6 @@ function ChatScreen({ user, onSignOut }) {
         authMode: 'apiKey'
       }).subscribe({
         next: (eventData) => {
-          console.log('Room update received:', eventData);
-          
           if (eventData.value?.data?.onRoomUpdate) {
             const updatedRoom = eventData.value.data.onRoomUpdate;
             
@@ -372,8 +355,6 @@ function ChatScreen({ user, onSignOut }) {
     setMessageError(null);
     
     try {
-      console.log('Fetching messages for room:', selectedRoomId);
-      
       const result = await client.graphql({
         query: getRecentMessages,
         variables: { roomId: selectedRoomId },
@@ -458,8 +439,6 @@ function ChatScreen({ user, onSignOut }) {
     }, 100);
     
     try {
-      console.log('Sending message to room:', selectedRoomId);
-      
       const result = await client.graphql({
         query: sendMessageMutation,
         variables: {
@@ -472,8 +451,6 @@ function ChatScreen({ user, onSignOut }) {
         },
         authMode: 'apiKey'
       });
-      
-      console.log('メッセージ送信成功:', result.data?.sendMessage);
       
       // サブスクリプション経由で実際のメッセージが届く
       
@@ -512,7 +489,6 @@ function ChatScreen({ user, onSignOut }) {
 
     setIsModalSearching(true);
     try {
-      console.log('Searching users for modal:', searchTerm);
       const result = await client.graphql({
         query: searchUsers,
         variables: { 
@@ -526,7 +502,6 @@ function ChatScreen({ user, onSignOut }) {
         const filteredUsers = result.data.searchUsers.items
           .filter(u => u.userId !== currentUser?.userId);
         
-        console.log('Modal search results:', filteredUsers);
         setModalSearchResults(filteredUsers);
       }
     } catch (error) {
@@ -546,7 +521,6 @@ function ChatScreen({ user, onSignOut }) {
 
     setIsDmSearching(true);
     try {
-      console.log('Searching users for DM:', searchTerm);
       const result = await client.graphql({
         query: searchUsers,
         variables: { 
@@ -560,7 +534,6 @@ function ChatScreen({ user, onSignOut }) {
         const filteredUsers = result.data.searchUsers.items.filter(
           u => u.userId !== currentUser?.userId
         );
-        console.log('DM search results:', filteredUsers);
         setDmSearchResults(filteredUsers);
       }
     } catch (error) {
@@ -604,8 +577,6 @@ function ChatScreen({ user, onSignOut }) {
     setIsRoomCreationLoading(true);
 
     try {
-      console.log('Creating room:', newRoomName, selectedUsers);
-      
       const result = await client.graphql({
         query: createGroupRoom,
         variables: {
@@ -619,7 +590,6 @@ function ChatScreen({ user, onSignOut }) {
       });
 
       if (result.data.createGroupRoom) {
-        console.log('Room created successfully:', result.data.createGroupRoom);
         const createdRoom = result.data.createGroupRoom;
         
         const newRoom = {
@@ -654,7 +624,6 @@ function ChatScreen({ user, onSignOut }) {
     if (!currentUser?.userId || !targetUserId) return;
 
     try {
-      console.log('Creating direct room with:', targetUserId);
       const result = await client.graphql({
         query: createDirectRoom,
         variables: {
@@ -665,7 +634,6 @@ function ChatScreen({ user, onSignOut }) {
       });
 
       if (result.data.createDirectRoom) {
-        console.log('Direct room created:', result.data.createDirectRoom);
         const newRoom = {
           ...result.data.createDirectRoom,
           lastMessage: result.data.createDirectRoom.lastMessage || "未入力",
