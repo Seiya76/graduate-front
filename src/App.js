@@ -732,35 +732,12 @@ function ChatScreen({ user, onSignOut }) {
             <span className="chat-icon">Chat</span>
           </div>
           <div className="header-actions">
-            <button className="icon-btn search-btn" title="検索"></button>
             <button
               className="icon-btn signout-btn"
               onClick={onSignOut}
               title="サインアウト"
             ></button>
           </div>
-        </div>
-
-        {/* 接続状態 */}
-        <div className="connection-status">
-          <div
-            className={`connection-indicator ${
-              isConnected ? "connected" : "disconnected"
-            }`}
-          >
-            <span
-              className={`status-dot ${isConnected ? "online" : "offline"}`}
-            ></span>
-            <span className="status-text">
-              {isConnected ? "リアルタイム接続中" : "オフライン"}
-            </span>
-          </div>
-          {connectionError && (
-            <div className="connection-error">
-              <span className="error-icon">⚠️</span>
-              <span className="error-text">{connectionError}</span>
-            </div>
-          )}
         </div>
 
         {/* 新しいチャット */}
@@ -1074,16 +1051,6 @@ function ChatScreen({ user, onSignOut }) {
           </div>
         </div>
 
-        {/* エラー表示 */}
-        {messageError && (
-          <div className="error-banner">
-            <div className="error-content">
-              <span className="error-icon">⚠️</span>
-              <span className="error-text">{messageError}</span>
-            </div>
-          </div>
-        )}
-
         {/* メッセージ一覧 */}
         <div className="messages-container">
           <div className="messages-list">
@@ -1226,7 +1193,7 @@ function App() {
     <div className="App">
       <header className="App-header">
         <img src={logo} className="App-logo" alt="logo" />
-        <h1>G00gleChat</h1>
+        <h1>ChatApp</h1>
         <div className="auth-buttons">
           <button onClick={() => auth.signinRedirect()} className="signin-btn">
             サインイン
