@@ -6,6 +6,8 @@ import { Amplify } from "aws-amplify";
 import { generateClient } from "aws-amplify/api";
 import config from "./aws-exports.js";
 
+import { useUserSearch } from './hooks/useUserSearch';
+
 // GraphQLクエリをインポート
 import {
   createGroupRoom,
@@ -50,16 +52,6 @@ function ChatScreen({ user, onSignOut }) {
   const [selectedSpace, setSelectedSpace] = useState("ホーム");
   const [currentUser, setCurrentUser] = useState(null);
   const [userRooms, setUserRooms] = useState([]);
-
-  // ルーム作成モーダル用のstate
-  const [modalSearchTerm, setModalSearchTerm] = useState("");
-  const [modalSearchResults, setModalSearchResults] = useState([]);
-  const [isModalSearching, setIsModalSearching] = useState(false);
-
-  // ダイレクトメッセージ用のstate
-  const [dmSearchTerm, setDmSearchTerm] = useState("");
-  const [dmSearchResults, setDmSearchResults] = useState([]);
-  const [isDmSearching, setIsDmSearching] = useState(false);
 
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [isRoomCreationLoading, setIsRoomCreationLoading] = useState(false);
@@ -503,96 +495,6 @@ function ChatScreen({ user, onSignOut }) {
     [sendMessage]
   );
 
-  // ユーザー検索（モーダル用）
-  const searchUsersForModal = async (searchTerm) => {
-    if (!searchTerm.trim()) {
-      setModalSearchResults([]);
-      return;
-    }
-
-    setIsModalSearching(true);
-    try {
-      const result = await client.graphql({
-        query: searchUsers,
-        variables: {
-          searchTerm: searchTerm.trim(),
-          limit: 50,
-        },
-        authMode: "apiKey",
-      });
-
-      if (result.data.searchUsers?.items) {
-        const filteredUsers = result.data.searchUsers.items.filter(
-          (u) => u.userId !== currentUser?.userId
-        );
-
-        setModalSearchResults(filteredUsers);
-      }
-    } catch (error) {
-      console.error("Error searching users for modal:", error);
-      setModalSearchResults([]);
-    } finally {
-      setIsModalSearching(false);
-    }
-  };
-
-  // DM用検索
-  const searchUsersForDM = async (searchTerm) => {
-    if (!searchTerm.trim()) {
-      setDmSearchResults([]);
-      return;
-    }
-
-    setIsDmSearching(true);
-    try {
-      const result = await client.graphql({
-        query: searchUsers,
-        variables: {
-          searchTerm: searchTerm.trim(),
-          limit: 20,
-        },
-        authMode: "apiKey",
-      });
-
-      if (result.data.searchUsers?.items) {
-        const filteredUsers = result.data.searchUsers.items.filter(
-          (u) => u.userId !== currentUser?.userId
-        );
-        setDmSearchResults(filteredUsers);
-      }
-    } catch (error) {
-      console.error("Error searching users for DM:", error);
-      setDmSearchResults([]);
-    } finally {
-      setIsDmSearching(false);
-    }
-  };
-
-  // モーダル検索のデバウンス処理
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (modalSearchTerm) {
-        searchUsersForModal(modalSearchTerm);
-      } else {
-        setModalSearchResults([]);
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [modalSearchTerm, currentUser]);
-
-  // DM検索のデバウンス処理
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (dmSearchTerm) {
-        searchUsersForDM(dmSearchTerm);
-      } else {
-        setDmSearchResults([]);
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [dmSearchTerm, currentUser]);
 
   // グループルーム作成
   const createGroupRoom_func = async () => {

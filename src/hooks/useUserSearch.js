@@ -1,4 +1,3 @@
-// hooks/useUserSearch.js
 import { useState, useEffect } from 'react';
 import { generateClient } from 'aws-amplify/api';
 import { searchUsers } from '../graphql/queries';
