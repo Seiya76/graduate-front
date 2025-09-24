@@ -1063,18 +1063,12 @@ function ChatScreen({ user, onSignOut }) {
             </div>
           </div>
           <div className="chat-actions">
-            <button className="action-btn">未読</button>
-            <button className="action-btn">スレッド</button>
-            <button className="icon-btn pin-btn" title="ピン留め"></button>
 
             {/* ユーザー情報表示 */}
             <div className="user-profile-display">
               <div className="user-avatar-display">{getDisplayAvatar()}</div>
               <div className="user-info-display">
                 <div className="user-name-display">{getDisplayName()}</div>
-                <div className="user-status-display">
-                  {currentUser?.status || "active"}
-                </div>
               </div>
             </div>
           </div>
@@ -1180,7 +1174,7 @@ function ChatScreen({ user, onSignOut }) {
                   {isSendingMessage ? (
                     <span className="loading-spinner-small"></span>
                   ) : (
-                    "📤"
+                    "送信"
                   )}
                 </button>
               </div>
