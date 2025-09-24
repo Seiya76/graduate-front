@@ -10,6 +10,7 @@ const ChatScreen = ({ user, onSignOut }) => {
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
 
   // カスタムフック使用
+  const { messages, isLoading, isSending, error, sendMessage, messagesEndRef } = useMessages(selectedRoomId, currentUser);
   const currentUser = useCurrentUser(user);
   const { 
     groupRooms, 
