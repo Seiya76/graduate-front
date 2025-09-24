@@ -82,22 +82,15 @@ export const searchUsers = /* GraphQL */ `
     }
   }
 `;
-export const getMessages = /* GraphQL */ `
-  query GetMessages($roomId: String!, $limit: Int, $nextToken: String) {
-    getMessages(roomId: $roomId, limit: $limit, nextToken: $nextToken) {
-      items {
-        messageId
-        roomId
-        userId
-        content
-        messageType
-        createdAt
-        updatedAt
-        isDeleted
-        editedAt
-        __typename
-      }
-      nextToken
+export const getRecentMessages = /* GraphQL */ `
+  query GetRecentMessages($roomId: String!) {
+    getRecentMessages(roomId: $roomId) {
+      messageId
+      roomId
+      userId
+      nickname
+      content
+      createdAt
       __typename
     }
   }

@@ -60,22 +60,9 @@ export const sendMessage = /* GraphQL */ `
       messageId
       roomId
       userId
+      nickname
       content
-      messageType
       createdAt
-      updatedAt
-      isDeleted
-      editedAt
-      user {
-        userId
-        createdAt
-        email
-        emailVerified
-        nickname
-        status
-        updatedAt
-        __typename
-      }
       __typename
     }
   }

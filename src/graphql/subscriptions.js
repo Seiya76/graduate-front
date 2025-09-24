@@ -23,23 +23,21 @@ export const onMessageSent = /* GraphQL */ `
       messageId
       roomId
       userId
+      nickname
       content
-      messageType
       createdAt
-      updatedAt
-      isDeleted
-      editedAt
-      user {
-        userId
-        createdAt
-        email
-        emailVerified
-        nickname
-        status
-        updatedAt
-        __typename
-      }
       __typename
+    }
+  }
+`;
+
+export const onUserTyping = `
+  subscription OnUserTyping($roomId: String!) {
+    onUserTyping(roomId: $roomId) {
+      roomId
+      userId
+      nickname
+      isTyping
     }
   }
 `;

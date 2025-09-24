@@ -6,158 +6,33 @@ import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/api';
 import config from './aws-exports.js';
 
+// GraphQLクエリをインポート
+import { 
+  createGroupRoom, 
+  createDirectRoom, 
+  joinRoom,
+  sendMessage as sendMessageMutation
+} from './graphql/mutations';
+
+import { 
+  getCurrentUser,
+  getUser, 
+  searchUsers, 
+  getUserRooms, 
+  getRoom,
+  getRecentMessages
+} from './graphql/queries';
+
+import {
+  onMessageSent,
+  onRoomUpdate
+} from './graphql/subscriptions';
+
 Amplify.configure(config);
 
 const client = generateClient();
 
-// GraphQL Mutations
-const CREATE_GROUP_ROOM = `
-  mutation CreateGroupRoom($input: CreateGroupRoomInput!) {
-    createGroupRoom(input: $input) {
-      roomId
-      roomName
-      roomType
-      createdBy
-      createdAt
-      memberCount
-      updatedAt
-    }
-  }
-`;
-
-const CREATE_DIRECT_ROOM = `
-  mutation CreateDirectRoom($targetUserId: ID!, $createdBy: ID!) {
-    createDirectRoom(targetUserId: $targetUserId, createdBy: $createdBy) {
-      roomId
-      roomName
-      roomType
-      createdBy
-      createdAt
-      memberCount
-      updatedAt
-    }
-  }
-`;
-
-const JOIN_ROOM = `
-  mutation JoinRoom($roomId: ID!, $userId: ID!) {
-    joinRoom(roomId: $roomId, userId: $userId) {
-      userId
-      roomId
-      joinedAt
-      role
-    }
-  }
-`;
-
-const SEND_MESSAGE = `
-  mutation SendMessage($input: SendMessageInput!) {
-    sendMessage(input: $input) {
-      messageId
-      roomId
-      userId
-      content
-      messageType
-      createdAt
-      updatedAt
-      isDeleted
-      user {
-        userId
-        nickname
-        email
-        status
-      }
-    }
-  }
-`;
-
-// GraphQL Queries
-const GET_USER_ROOMS = `
-  query GetUserRooms($userId: ID!, $limit: Int, $nextToken: String) {
-    getUserRooms(userId: $userId, limit: $limit, nextToken: $nextToken) {
-      items {
-        roomId
-        roomName
-        roomType
-        createdBy
-        createdAt
-        lastMessage
-        lastMessageAt
-        memberCount
-        updatedAt
-      }
-      nextToken
-    }
-  }
-`;
-
-const GET_USER = `
-  query GetUser($userId: ID!) {
-    getUser(userId: $userId) {
-      userId
-      createdAt
-      email
-      emailVerified
-      nickname
-      status
-      updatedAt
-    }
-  }
-`;
-
-const SEARCH_USERS = `
-  query SearchUsers($searchTerm: String!, $limit: Int) {
-    searchUsers(searchTerm: $searchTerm, limit: $limit) {
-      items {
-        userId
-        nickname
-        email
-        status
-      }
-    }
-  }
-`;
-
-const GET_ROOM = `
-  query GetRoom($roomId: ID!) {
-    getRoom(roomId: $roomId) {
-      roomId
-      roomName
-      roomType
-      createdBy
-      createdAt
-      lastMessage
-      lastMessageAt
-      memberCount
-      updatedAt
-    }
-  }
-`;
-
-const GET_MESSAGES = `
-  query GetMessages($roomId: String!, $limit: Int, $nextToken: String) {
-    getMessages(roomId: $roomId, limit: $limit, nextToken: $nextToken) {
-      items {
-        messageId
-        roomId
-        userId
-        content
-        messageType
-        createdAt
-        updatedAt
-        isDeleted
-        user {
-          userId
-          nickname
-          email
-          status
-        }
-      }
-      nextToken
-    }
-  }
-`;
-
+// getUserByEmailクエリが不足している場合は追加定義
 const GET_USER_BY_EMAIL = `
   query GetUserByEmail($email: String!) {
     getUserByEmail(email: $email) {
@@ -168,44 +43,7 @@ const GET_USER_BY_EMAIL = `
       nickname
       status
       updatedAt
-    }
-  }
-`;
-
-// GraphQL Subscriptions
-const ON_MESSAGE_SENT = `
-  subscription OnMessageSent($roomId: String!) {
-    onMessageSent(roomId: $roomId) {
-      messageId
-      roomId
-      userId
-      content
-      messageType
-      createdAt
-      updatedAt
-      isDeleted
-      user {
-        userId
-        nickname
-        email
-        status
-      }
-    }
-  }
-`;
-
-const ON_ROOM_UPDATE = `
-  subscription OnRoomUpdate($userId: ID!) {
-    onRoomUpdate(userId: $userId) {
-      roomId
-      roomName
-      roomType
-      createdBy
-      createdAt
-      lastMessage
-      lastMessageAt
-      memberCount
-      updatedAt
+      __typename
     }
   }
 `;
@@ -238,11 +76,6 @@ function ChatScreen({ user, onSignOut }) {
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [messageError, setMessageError] = useState(null);
 
-  // メッセージ履歴用のstate
-  const [messageNextToken, setMessageNextToken] = useState(null);
-  const [hasMoreMessages, setHasMoreMessages] = useState(true);
-  const [isLoadingMoreMessages, setIsLoadingMoreMessages] = useState(false);
-
   // リアルタイム接続用のstate
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
@@ -251,8 +84,6 @@ function ChatScreen({ user, onSignOut }) {
   const messageSubscriptionRef = useRef(null);
   const roomSubscriptionRef = useRef(null);
   const messagesEndRef = useRef(null);
-  const messagesContainerRef = useRef(null);
-  const previousScrollHeight = useRef(0);
 
   // 選択されたルームのID取得
   const selectedRoomId = React.useMemo(() => {
@@ -277,7 +108,7 @@ function ChatScreen({ user, onSignOut }) {
         // まずuserIdで検索を試す
         try {
           result = await client.graphql({
-            query: GET_USER,
+            query: getUser,
             variables: { userId: oidcSub },
             authMode: 'apiKey'
           });
@@ -347,7 +178,7 @@ function ChatScreen({ user, onSignOut }) {
       try {
         console.log('Fetching rooms for user:', currentUser.userId);
         const result = await client.graphql({
-          query: GET_USER_ROOMS,
+          query: getUserRooms,
           variables: { 
             userId: currentUser.userId,
             limit: 50 
@@ -384,7 +215,7 @@ function ChatScreen({ user, onSignOut }) {
 
     try {
       messageSubscriptionRef.current = client.graphql({
-        query: ON_MESSAGE_SENT,
+        query: onMessageSent,
         variables: { roomId: selectedRoomId },
         authMode: 'apiKey'
       }).subscribe({
@@ -398,15 +229,14 @@ function ChatScreen({ user, onSignOut }) {
             const formattedMessage = {
               id: newMsg.messageId,
               messageId: newMsg.messageId,
-              sender: newMsg.user?.nickname || '不明なユーザー',
+              sender: newMsg.nickname || '不明なユーザー',
               content: newMsg.content,
               time: new Date(newMsg.createdAt).toLocaleTimeString('ja-JP', { 
                 hour: '2-digit', 
                 minute: '2-digit' 
               }),
-              date: new Date(newMsg.createdAt).toLocaleDateString('ja-JP'),
               isOwn: newMsg.userId === currentUser.userId,
-              avatar: (newMsg.user?.nickname || 'UN').substring(0, 2).toUpperCase(),
+              avatar: (newMsg.nickname || 'UN').substring(0, 2).toUpperCase(),
               userId: newMsg.userId,
               createdAt: newMsg.createdAt
             };
@@ -424,17 +254,10 @@ function ChatScreen({ user, onSignOut }) {
               // 新しいメッセージを追加
               const updated = [...filtered, formattedMessage];
               
-              // 自動スクロール（最下部付近にいる場合のみ）
-              if (messagesContainerRef.current) {
-                const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
-                const isNearBottom = scrollTop + clientHeight >= scrollHeight - 100;
-                
-                if (isNearBottom || formattedMessage.isOwn) {
-                  setTimeout(() => {
-                    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-                  }, 100);
-                }
-              }
+              // 自動スクロール
+              setTimeout(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+              }, 100);
               
               return updated;
             });
@@ -480,7 +303,7 @@ function ChatScreen({ user, onSignOut }) {
     
     try {
       roomSubscriptionRef.current = client.graphql({
-        query: ON_ROOM_UPDATE,
+        query: onRoomUpdate,
         variables: { userId: currentUser.userId },
         authMode: 'apiKey'
       }).subscribe({
@@ -524,7 +347,7 @@ function ChatScreen({ user, onSignOut }) {
   // 通知を表示
   const showNotification = (message) => {
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(`${message.user?.nickname || '新着メッセージ'}`, {
+      new Notification(`${message.nickname || '新着メッセージ'}`, {
         body: message.content,
         icon: '/chat-icon.png',
         tag: message.messageId,
@@ -540,48 +363,40 @@ function ChatScreen({ user, onSignOut }) {
     }
   }, []);
 
-  // 初回メッセージ取得
-  const fetchInitialMessages = async () => {
+  // メッセージ取得
+  const fetchMessages = async () => {
     if (!selectedRoomId) return;
     
     setIsLoadingMessages(true);
     setMessages([]);
     setMessageError(null);
-    setMessageNextToken(null);
-    setHasMoreMessages(true);
     
     try {
-      console.log('Fetching initial messages for room:', selectedRoomId);
+      console.log('Fetching messages for room:', selectedRoomId);
       
       const result = await client.graphql({
-        query: GET_MESSAGES,
-        variables: { 
-          roomId: selectedRoomId,
-          limit: 50
-        },
+        query: getRecentMessages,
+        variables: { roomId: selectedRoomId },
         authMode: 'apiKey'
       });
       
-      if (result.data?.getMessages) {
-        const fetchedMessages = result.data.getMessages.items.map(msg => ({
+      if (result.data?.getRecentMessages) {
+        const fetchedMessages = result.data.getRecentMessages.map(msg => ({
           id: msg.messageId,
           messageId: msg.messageId,
-          sender: msg.user?.nickname || '不明なユーザー',
+          sender: msg.nickname || '不明なユーザー',
           content: msg.content,
           time: new Date(msg.createdAt).toLocaleTimeString('ja-JP', { 
             hour: '2-digit', 
             minute: '2-digit' 
           }),
-          date: new Date(msg.createdAt).toLocaleDateString('ja-JP'),
           isOwn: msg.userId === currentUser?.userId,
-          avatar: (msg.user?.nickname || 'UN').substring(0, 2).toUpperCase(),
+          avatar: (msg.nickname || 'UN').substring(0, 2).toUpperCase(),
           userId: msg.userId,
           createdAt: msg.createdAt
         }));
         
         setMessages(fetchedMessages);
-        setMessageNextToken(result.data.getMessages.nextToken);
-        setHasMoreMessages(!!result.data.getMessages.nextToken);
         
         // 初回読み込み時は最下部にスクロール
         setTimeout(() => {
@@ -596,109 +411,13 @@ function ChatScreen({ user, onSignOut }) {
     }
   };
 
-  // 過去のメッセージを読み込む
-  const loadMoreMessages = useCallback(async () => {
-    if (!selectedRoomId || !hasMoreMessages || isLoadingMoreMessages || !messageNextToken) {
-      return;
-    }
-    
-    setIsLoadingMoreMessages(true);
-    
-    // スクロール位置を保存
-    if (messagesContainerRef.current) {
-      previousScrollHeight.current = messagesContainerRef.current.scrollHeight;
-    }
-    
-    try {
-      console.log('Loading more messages with token:', messageNextToken);
-      
-      const result = await client.graphql({
-        query: GET_MESSAGES,
-        variables: { 
-          roomId: selectedRoomId,
-          limit: 30,
-          nextToken: messageNextToken
-        },
-        authMode: 'apiKey'
-      });
-      
-      const data = result.data?.getMessages;
-      
-      if (data?.items) {
-        const olderMessages = data.items.map(msg => ({
-          id: msg.messageId,
-          messageId: msg.messageId,
-          sender: msg.user?.nickname || '不明なユーザー',
-          content: msg.content,
-          time: new Date(msg.createdAt).toLocaleTimeString('ja-JP', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          }),
-          date: new Date(msg.createdAt).toLocaleDateString('ja-JP'),
-          isOwn: msg.userId === currentUser?.userId,
-          avatar: (msg.user?.nickname || 'UN').substring(0, 2).toUpperCase(),
-          userId: msg.userId,
-          createdAt: msg.createdAt
-        }));
-        
-        // 既存メッセージの前に追加（重複チェック付き）
-        setMessages(prevMessages => {
-          const existingIds = new Set(prevMessages.map(m => m.messageId));
-          const newMessages = olderMessages.filter(m => !existingIds.has(m.messageId));
-          return [...newMessages, ...prevMessages];
-        });
-        
-        // 次のトークンを更新
-        setMessageNextToken(data.nextToken);
-        setHasMoreMessages(!!data.nextToken);
-        
-        // スクロール位置を維持
-        requestAnimationFrame(() => {
-          if (messagesContainerRef.current && previousScrollHeight.current) {
-            const newScrollHeight = messagesContainerRef.current.scrollHeight;
-            const scrollDiff = newScrollHeight - previousScrollHeight.current;
-            messagesContainerRef.current.scrollTop += scrollDiff;
-          }
-        });
-      }
-    } catch (err) {
-      console.error('過去メッセージ取得エラー:', err);
-      setHasMoreMessages(false);
-    } finally {
-      setIsLoadingMoreMessages(false);
-    }
-  }, [selectedRoomId, hasMoreMessages, isLoadingMoreMessages, messageNextToken, currentUser]);
-
-  // スクロールイベントハンドラー
-  const handleScroll = useCallback(() => {
-    if (!messagesContainerRef.current) return;
-    
-    const { scrollTop } = messagesContainerRef.current;
-    
-    // 上部に近づいたら過去のメッセージを読み込む
-    if (scrollTop < 200 && hasMoreMessages && !isLoadingMoreMessages) {
-      loadMoreMessages();
-    }
-  }, [hasMoreMessages, isLoadingMoreMessages, loadMoreMessages]);
-
-  // スクロールイベントのセットアップ
-  useEffect(() => {
-    const container = messagesContainerRef.current;
-    if (container) {
-      container.addEventListener('scroll', handleScroll);
-      return () => container.removeEventListener('scroll', handleScroll);
-    }
-  }, [handleScroll]);
-
   // ルーム変更時のメッセージ取得
   useEffect(() => {
     if (selectedRoomId && currentUser?.userId) {
-      fetchInitialMessages();
+      fetchMessages();
     } else {
       setMessages([]);
       setMessageError(null);
-      setMessageNextToken(null);
-      setHasMoreMessages(true);
     }
   }, [selectedRoomId, currentUser?.userId]);
 
@@ -710,7 +429,6 @@ function ChatScreen({ user, onSignOut }) {
 
     const messageContent = newMessage.trim();
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const now = new Date();
     
     // 楽観的UI更新
     const optimisticMessage = {
@@ -718,15 +436,14 @@ function ChatScreen({ user, onSignOut }) {
       messageId: tempId,
       sender: currentUser.nickname || currentUser.email || '自分',
       content: messageContent,
-      time: now.toLocaleTimeString('ja-JP', { 
+      time: new Date().toLocaleTimeString('ja-JP', { 
         hour: '2-digit', 
         minute: '2-digit' 
       }),
-      date: now.toLocaleDateString('ja-JP'),
       isOwn: true,
       avatar: (currentUser.nickname || currentUser.email || 'ME').substring(0, 2).toUpperCase(),
       userId: currentUser.userId,
-      createdAt: now.toISOString(),
+      createdAt: new Date().toISOString(),
       isOptimistic: true
     };
     
@@ -744,13 +461,13 @@ function ChatScreen({ user, onSignOut }) {
       console.log('Sending message to room:', selectedRoomId);
       
       const result = await client.graphql({
-        query: SEND_MESSAGE,
+        query: sendMessageMutation,
         variables: {
           input: {
             roomId: selectedRoomId,
             userId: currentUser.userId,
-            content: messageContent,
-            messageType: 'text'
+            nickname: currentUser.nickname || currentUser.email || 'ユーザー',
+            content: messageContent
           }
         },
         authMode: 'apiKey'
@@ -778,32 +495,6 @@ function ChatScreen({ user, onSignOut }) {
     }
   }, [newMessage, selectedRoomId, currentUser, isSendingMessage]);
 
-  // 日付区切りを表示するヘルパー関数
-  const shouldShowDateSeparator = (currentMsg, previousMsg) => {
-    if (!previousMsg) return true;
-    return currentMsg.date !== previousMsg.date;
-  };
-
-  // 日付フォーマットヘルパー
-  const formatDateSeparator = (dateStr) => {
-    const date = new Date(dateStr);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    
-    if (date.toDateString() === today.toDateString()) {
-      return '今日';
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return '昨日';
-    } else {
-      return date.toLocaleDateString('ja-JP', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-    }
-  };
-
   // キーボードイベントハンドラー
   const handleKeyPress = useCallback((e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -821,8 +512,9 @@ function ChatScreen({ user, onSignOut }) {
 
     setIsModalSearching(true);
     try {
+      console.log('Searching users for modal:', searchTerm);
       const result = await client.graphql({
-        query: SEARCH_USERS,
+        query: searchUsers,
         variables: { 
           searchTerm: searchTerm.trim(),
           limit: 50
@@ -833,6 +525,8 @@ function ChatScreen({ user, onSignOut }) {
       if (result.data.searchUsers?.items) {
         const filteredUsers = result.data.searchUsers.items
           .filter(u => u.userId !== currentUser?.userId);
+        
+        console.log('Modal search results:', filteredUsers);
         setModalSearchResults(filteredUsers);
       }
     } catch (error) {
@@ -852,8 +546,9 @@ function ChatScreen({ user, onSignOut }) {
 
     setIsDmSearching(true);
     try {
+      console.log('Searching users for DM:', searchTerm);
       const result = await client.graphql({
-        query: SEARCH_USERS,
+        query: searchUsers,
         variables: { 
           searchTerm: searchTerm.trim(),
           limit: 20 
@@ -865,6 +560,7 @@ function ChatScreen({ user, onSignOut }) {
         const filteredUsers = result.data.searchUsers.items.filter(
           u => u.userId !== currentUser?.userId
         );
+        console.log('DM search results:', filteredUsers);
         setDmSearchResults(filteredUsers);
       }
     } catch (error) {
@@ -908,8 +604,10 @@ function ChatScreen({ user, onSignOut }) {
     setIsRoomCreationLoading(true);
 
     try {
+      console.log('Creating room:', newRoomName, selectedUsers);
+      
       const result = await client.graphql({
-        query: CREATE_GROUP_ROOM,
+        query: createGroupRoom,
         variables: {
           input: {
             roomName: newRoomName.trim(),
@@ -921,6 +619,7 @@ function ChatScreen({ user, onSignOut }) {
       });
 
       if (result.data.createGroupRoom) {
+        console.log('Room created successfully:', result.data.createGroupRoom);
         const createdRoom = result.data.createGroupRoom;
         
         const newRoom = {
@@ -955,8 +654,9 @@ function ChatScreen({ user, onSignOut }) {
     if (!currentUser?.userId || !targetUserId) return;
 
     try {
+      console.log('Creating direct room with:', targetUserId);
       const result = await client.graphql({
-        query: CREATE_DIRECT_ROOM,
+        query: createDirectRoom,
         variables: {
           targetUserId: targetUserId,
           createdBy: currentUser.userId
@@ -965,6 +665,7 @@ function ChatScreen({ user, onSignOut }) {
       });
 
       if (result.data.createDirectRoom) {
+        console.log('Direct room created:', result.data.createDirectRoom);
         const newRoom = {
           ...result.data.createDirectRoom,
           lastMessage: result.data.createDirectRoom.lastMessage || "未入力",
@@ -1195,6 +896,14 @@ function ChatScreen({ user, onSignOut }) {
                 <span className="nav-icon icon-team"></span>
                 <span className="nav-text">{room.roomName}</span>
                 <span className="member-count">({room.memberCount})</span>
+                {room.lastMessageAt && (
+                  <span className="last-message-time">
+                    {new Date(room.lastMessageAt).toLocaleTimeString('ja-JP', { 
+                      hour: '2-digit', 
+                      minute: '2-digit' 
+                    })}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -1320,7 +1029,7 @@ function ChatScreen({ user, onSignOut }) {
         )}
 
         {/* メッセージ一覧 */}
-        <div className="messages-container" ref={messagesContainerRef}>
+        <div className="messages-container">
           <div className="messages-list">
             {selectedSpace === "ホーム" ? (
               <div className="welcome-message">
@@ -1351,68 +1060,32 @@ function ChatScreen({ user, onSignOut }) {
                   </div>
                 )}
                 
-                {/* 過去のメッセージ読み込み */}
-                {hasMoreMessages && messages.length > 0 && (
-                  <div className="load-more-section">
-                    {isLoadingMoreMessages ? (
-                      <div className="loading-more">
-                        <div className="spinner-small"></div>
-                        <span>過去のメッセージを読み込み中...</span>
-                      </div>
-                    ) : (
-                      <button 
-                        className="load-more-button"
-                        onClick={loadMoreMessages}
-                      >
-                        過去のメッセージを表示
-                      </button>
-                    )}
-                  </div>
-                )}
-                
-                {/* 会話の開始 */}
-                {!hasMoreMessages && messages.length > 0 && (
-                  <div className="conversation-start">
-                    <span>会話の開始</span>
-                  </div>
-                )}
-                
                 {/* メッセージリスト */}
                 {messages.map((message, index) => {
-                  const showDate = shouldShowDateSeparator(message, messages[index - 1]);
                   const showAvatar = index === 0 || messages[index - 1].userId !== message.userId;
                   const isLastFromUser = index === messages.length - 1 || messages[index + 1]?.userId !== message.userId;
                   
                   return (
-                    <React.Fragment key={message.messageId || message.id}>
-                      {/* 日付区切り */}
-                      {showDate && (
-                        <div className="date-separator">
-                          <span>{formatDateSeparator(message.createdAt)}</span>
-                        </div>
+                    <div 
+                      key={message.messageId || message.id} 
+                      className={`message-item ${message.isOwn ? 'own-message' : ''} ${isLastFromUser ? 'last-from-user' : ''} ${message.isOptimistic ? 'optimistic' : ''}`}
+                    >
+                      {!message.isOwn && showAvatar && (
+                        <div className="message-avatar user-avatar">{message.avatar}</div>
                       )}
-                      
-                      {/* メッセージ */}
-                      <div 
-                        className={`message-item ${message.isOwn ? 'own-message' : ''} ${isLastFromUser ? 'last-from-user' : ''} ${message.isOptimistic ? 'optimistic' : ''}`}
-                      >
-                        {!message.isOwn && showAvatar && (
-                          <div className="message-avatar user-avatar">{message.avatar}</div>
+                      <div className={`message-content ${!message.isOwn && !showAvatar ? 'no-avatar' : ''}`}>
+                        {showAvatar && (
+                          <div className="message-header">
+                            <span className="sender-name">{message.sender}</span>
+                            <span className="message-time">{message.time}</span>
+                          </div>
                         )}
-                        <div className={`message-content ${!message.isOwn && !showAvatar ? 'no-avatar' : ''}`}>
-                          {showAvatar && (
-                            <div className="message-header">
-                              <span className="sender-name">{message.sender}</span>
-                              <span className="message-time">{message.time}</span>
-                            </div>
-                          )}
-                          <div className="message-text">{message.content}</div>
-                          {!showAvatar && (
-                            <div className="message-time-inline">{message.time}</div>
-                          )}
-                        </div>
+                        <div className="message-text">{message.content}</div>
+                        {!showAvatar && (
+                          <div className="message-time-inline">{message.time}</div>
+                        )}
                       </div>
-                    </React.Fragment>
+                    </div>
                   );
                 })}
                 
