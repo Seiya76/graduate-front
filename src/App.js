@@ -1150,9 +1150,6 @@ function ChatScreen({ user, onSignOut }) {
         {selectedSpace !== "ホーム" && selectedRoomId && (
           <div className="message-input-area">
             <div className="input-container">
-              <button className="attach-btn" title="ファイル添付">
-                📎
-              </button>
               <textarea
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
@@ -1174,7 +1171,7 @@ function ChatScreen({ user, onSignOut }) {
                   {isSendingMessage ? (
                     <span className="loading-spinner-small"></span>
                   ) : (
-                    "送信"
+                    ""
                   )}
                 </button>
               </div>
