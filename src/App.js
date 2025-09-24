@@ -7,6 +7,8 @@ import { generateClient } from "aws-amplify/api";
 import config from "./aws-exports.js";
 
 import { useUserSearch } from './hooks/useUserSearch';
+import { useCurrentUser } from './hooks/useAuth';
+import { useRooms } from './hooks/useRooms';
 
 // GraphQLクエリをインポート
 import {
@@ -31,30 +33,11 @@ Amplify.configure(config);
 
 const client = generateClient();
 
-// getUserByEmailクエリが不足している場合は追加定義
-const GET_USER_BY_EMAIL = `
-  query GetUserByEmail($email: String!) {
-    getUserByEmail(email: $email) {
-      userId
-      createdAt
-      email
-      emailVerified
-      nickname
-      status
-      updatedAt
-      __typename
-    }
-  }
-`;
-
 // Google Chat風のチャット画面コンポーネント
 function ChatScreen({ user, onSignOut }) {
   const [selectedSpace, setSelectedSpace] = useState("ホーム");
-  const [currentUser, setCurrentUser] = useState(null);
-  const [userRooms, setUserRooms] = useState([]);
 
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
-  const [isRoomCreationLoading, setIsRoomCreationLoading] = useState(false);
   const [newRoomName, setNewRoomName] = useState("");
   const [selectedUsers, setSelectedUsers] = useState([]);
 
@@ -81,110 +64,6 @@ function ChatScreen({ user, onSignOut }) {
     const room = userRooms.find((room) => room.roomName === selectedSpace);
     return room?.roomId || null;
   }, [selectedSpace, userRooms]);
-
-  // AppSyncからユーザー情報を取得
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      try {
-        const oidcSub = user.profile.sub;
-        const email = user.profile.email;
-
-        let result = null;
-
-        // まずuserIdで検索を試す
-        try {
-          result = await client.graphql({
-            query: getUser,
-            variables: { userId: oidcSub },
-            authMode: "apiKey",
-          });
-
-          if (result.data.getUser) {
-            setCurrentUser(result.data.getUser);
-            return;
-          }
-        } catch (userIdError) {
-          // userIdで見つからない場合の処理
-        }
-
-        // userIdで見つからない場合、emailで検索
-        if (email) {
-          try {
-            result = await client.graphql({
-              query: GET_USER_BY_EMAIL,
-              variables: { email: email },
-              authMode: "apiKey",
-            });
-
-            if (result.data.getUserByEmail) {
-              setCurrentUser(result.data.getUserByEmail);
-              return;
-            }
-          } catch (emailError) {
-            // emailでも見つからない場合の処理
-          }
-        }
-
-        // DynamoDBにデータがない場合はOIDC情報をフォールバック
-        const fallbackUser = {
-          userId: oidcSub,
-          nickname:
-            user.profile.name ||
-            user.profile.preferred_username ||
-            email?.split("@")[0],
-          email: email,
-          status: "active",
-        };
-        setCurrentUser(fallbackUser);
-      } catch (error) {
-        console.error("Error fetching current user:", error);
-
-        // エラーの場合もOIDC情報をフォールバック
-        const fallbackUser = {
-          userId: user.profile.sub,
-          nickname:
-            user.profile.name ||
-            user.profile.preferred_username ||
-            user.profile.email?.split("@")[0],
-          email: user.profile.email,
-          status: "active",
-        };
-        setCurrentUser(fallbackUser);
-      }
-    };
-
-    if (user?.profile?.sub) {
-      fetchCurrentUser();
-    }
-  }, [user]);
-
-  // ユーザーのルーム一覧を取得
-  useEffect(() => {
-    const fetchUserRooms = async () => {
-      if (!currentUser?.userId) return;
-
-      try {
-        const result = await client.graphql({
-          query: getUserRooms,
-          variables: {
-            userId: currentUser.userId,
-            limit: 50,
-          },
-          authMode: "apiKey",
-        });
-
-        if (result.data.getUserRooms?.items) {
-          setUserRooms(result.data.getUserRooms.items);
-        }
-      } catch (error) {
-        console.error("Error fetching user rooms:", error);
-      }
-    };
-
-    if (currentUser?.userId) {
-      fetchUserRooms();
-    }
-  }, [currentUser]);
 
   // メッセージサブスクリプションのセットアップ
   useEffect(() => {
@@ -281,55 +160,6 @@ function ChatScreen({ user, onSignOut }) {
       }
     };
   }, [selectedRoomId, currentUser?.userId]);
-
-  // ルーム更新のサブスクリプション
-  useEffect(() => {
-    if (!currentUser?.userId) return;
-
-    try {
-      roomSubscriptionRef.current = client
-        .graphql({
-          query: onRoomUpdate,
-          variables: { userId: currentUser.userId },
-          authMode: "apiKey",
-        })
-        .subscribe({
-          next: (eventData) => {
-            if (eventData.value?.data?.onRoomUpdate) {
-              const updatedRoom = eventData.value.data.onRoomUpdate;
-
-              // ルーム一覧を更新
-              setUserRooms((prevRooms) => {
-                const existingIndex = prevRooms.findIndex(
-                  (r) => r.roomId === updatedRoom.roomId
-                );
-
-                if (existingIndex >= 0) {
-                  // 既存のルームを更新
-                  const updated = [...prevRooms];
-                  updated[existingIndex] = updatedRoom;
-                  return updated;
-                } else {
-                  // 新しいルームを追加
-                  return [updatedRoom, ...prevRooms];
-                }
-              });
-            }
-          },
-          error: (error) => {
-            console.error("Room subscription error:", error);
-          },
-        });
-    } catch (error) {
-      console.error("Failed to setup room subscription:", error);
-    }
-
-    return () => {
-      if (roomSubscriptionRef.current) {
-        roomSubscriptionRef.current.unsubscribe();
-      }
-    };
-  }, [currentUser?.userId]);
 
   // 通知を表示
   const showNotification = (message) => {
@@ -495,89 +325,6 @@ function ChatScreen({ user, onSignOut }) {
     [sendMessage]
   );
 
-
-  // グループルーム作成
-  const createGroupRoom_func = async () => {
-    if (!newRoomName.trim() || !currentUser?.userId) return;
-
-    setIsRoomCreationLoading(true);
-
-    try {
-      const result = await client.graphql({
-        query: createGroupRoom,
-        variables: {
-          input: {
-            roomName: newRoomName.trim(),
-            memberUserIds: selectedUsers,
-            createdBy: currentUser.userId,
-          },
-        },
-        authMode: "apiKey",
-      });
-
-      if (result.data.createGroupRoom) {
-        const createdRoom = result.data.createGroupRoom;
-
-        const newRoom = {
-          ...createdRoom,
-          lastMessage: createdRoom.lastMessage || "未入力",
-          lastMessageAt: createdRoom.lastMessageAt || createdRoom.createdAt,
-        };
-        setUserRooms((prev) => [newRoom, ...prev]);
-
-        resetModal();
-
-        alert(
-          `ルーム「${newRoomName}」を作成しました。（${createdRoom.memberCount}人のメンバー）`
-        );
-
-        setSelectedSpace(createdRoom.roomName);
-      }
-    } catch (error) {
-      console.error("Error creating room:", error);
-
-      let errorMessage = "ルーム作成でエラーが発生しました。";
-      if (error.errors && error.errors.length > 0) {
-        errorMessage += "\n" + error.errors.map((e) => e.message).join("\n");
-      }
-
-      alert(errorMessage);
-    } finally {
-      setIsRoomCreationLoading(false);
-    }
-  };
-
-  // ダイレクトルーム作成
-  const createDirectRoom_func = async (targetUserId) => {
-    if (!currentUser?.userId || !targetUserId) return;
-
-    try {
-      const result = await client.graphql({
-        query: createDirectRoom,
-        variables: {
-          targetUserId: targetUserId,
-          createdBy: currentUser.userId,
-        },
-        authMode: "apiKey",
-      });
-
-      if (result.data.createDirectRoom) {
-        const newRoom = {
-          ...result.data.createDirectRoom,
-          lastMessage: result.data.createDirectRoom.lastMessage || "未入力",
-          lastMessageAt:
-            result.data.createDirectRoom.lastMessageAt ||
-            result.data.createDirectRoom.createdAt,
-        };
-        setUserRooms((prev) => [newRoom, ...prev]);
-        setSelectedSpace(result.data.createDirectRoom.roomName);
-      }
-    } catch (error) {
-      console.error("Error creating direct room:", error);
-      alert("ダイレクトルーム作成でエラーが発生しました: " + error.message);
-    }
-  };
-
   // 表示名の取得
   const getDisplayName = () => {
     return (
@@ -619,10 +366,6 @@ function ChatScreen({ user, onSignOut }) {
       return () => clearTimeout(timer);
     }
   }, [messageError]);
-
-  // グループルームとダイレクトルームの分類
-  const groupRooms = userRooms.filter((room) => room.roomType === "group");
-  const directRooms = userRooms.filter((room) => room.roomType === "direct");
 
   return (
     <div className="chat-app">
