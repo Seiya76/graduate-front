@@ -1,4 +1,3 @@
-// components/ChatScreen.js
 import React, { useState, useMemo } from 'react';
 import { useCurrentUser } from '../hooks/useAuth';
 import { useRooms } from '../hooks/useRooms';
@@ -30,6 +29,7 @@ const ChatScreen = ({ user, onSignOut }) => {
     return room?.roomId || null;
   }, [selectedSpace, groupRooms, directRooms]);
 
+  // グループルーム作成ハンドラー
   const handleCreateGroup = async (roomName, memberUserIds) => {
     try {
       const newRoom = await createGroup(roomName, memberUserIds);
@@ -43,6 +43,7 @@ const ChatScreen = ({ user, onSignOut }) => {
     }
   };
 
+  // ダイレクトルーム作成ハンドラー
   const handleCreateDirect = async (targetUserId) => {
     try {
       const newRoom = await createDirect(targetUserId);
