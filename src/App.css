@@ -135,32 +135,36 @@ body {
 
 /* User Avatar */
 .user-avatar {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); /*変更予定*/
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: white;
   text-transform: uppercase;
   flex-shrink: 0;
+  line-height: 1;
+  letter-spacing: -0.5px; 
 }
 
 .user-avatar-small {
-  width: 36px;
-  height: 36px;
-  font-size: 14px;
+  width: 40px;
+  height: 40px;
+  font-size: 13px;
+  letter-spacing: -0.3px;
 }
 
 .user-avatar-display {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   background-color: #4CAF50;
   font-size: 12px;
   font-weight: bold;
+  letter-spacing: -0.3px;
 }
 
 .App {
@@ -569,16 +573,21 @@ body {
 }
 
 .message-avatar {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 13px;
   background-color: #f1f3f4;
   flex-shrink: 0;
   position: relative;
+   font-weight: 600;     
+  line-height: 1;        
+  letter-spacing: -0.3px; 
+  text-transform: uppercase; 
+  color: white;          
 }
 
 .message-item:not(.own-message) .message-avatar {
