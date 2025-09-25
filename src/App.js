@@ -21,7 +21,7 @@ import MessageList from "./components/MessageList";
 import MessageInput from "./components/MessageInput";
 import CreateRoomModal from "./components/CreateRoomModal";
 
-Amplify.configure(config);
+//Amplify.configure(config);
 const client = generateClient();
 
 // 通知権限のリクエスト
