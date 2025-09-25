@@ -55,7 +55,7 @@ const MessageInput = ({
             {isSendingMessage ? (
               <span className="loading-spinner-small"></span>
             ) : (
-              "📤"
+              ""
             )}
           </button>
         </div>

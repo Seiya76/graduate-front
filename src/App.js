@@ -21,7 +21,7 @@ import MessageList from "./components/MessageList";
 import MessageInput from "./components/MessageInput";
 import CreateRoomModal from "./components/CreateRoomModal";
 
-//Amplify.configure(config);
+Amplify.configure(config);
 const client = generateClient();
 
 // 通知権限のリクエスト
@@ -39,7 +39,7 @@ function ChatScreen({ user, onSignOut }) {
   const [newRoomName, setNewRoomName] = useState("");
   const [selectedUsers, setSelectedUsers] = useState([]);
 
-  // カスタムフックの使用
+  // 各機能の使用
   const { currentUser, isLoading: isUserLoading } = useCurrentUser(user);
   
   const {
