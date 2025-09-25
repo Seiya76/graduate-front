@@ -13,9 +13,10 @@ const cognitoAuthConfig = {
   authority: "https://cognito-idp.ap-northeast-1.amazonaws.com/ap-northeast-1_ncffAodBj",
   client_id: "5buno8gs9brj93apmu9tvqqp77",
   redirect_uri: "https://main.d3rgq9lalaa9gb.amplifyapp.com",
+  post_logout_redirect_uri: "https://main.d3rgq9lalaa9gb.amplifyapp.com",
   response_type: "code",
-  scope: "email openid",
-  storage: window.localStorage,
+  scope: "openid email",
+  storage: window.localStorage, // ← ここ大事！リロードしても state が消えない
 };
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
