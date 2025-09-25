@@ -1,3 +1,8 @@
+/* ==========================================================================
+   Base Styles
+   ========================================================================== */
+
+/* Reset & Base */
 * {
   margin: 0;
   padding: 0;
@@ -10,6 +15,10 @@ body {
   color: #3c4043;
   overflow: hidden;
 }
+
+/* ==========================================================================
+   Common Components
+   ========================================================================== */
 
 /* Buttons */
 .btn {
@@ -137,7 +146,7 @@ body {
 .user-avatar {
   width: 32px;
   height: 32px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); /*変更予定*/
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -148,7 +157,7 @@ body {
   text-transform: uppercase;
   flex-shrink: 0;
   line-height: 1;
-  letter-spacing: -0.5px; 
+  letter-spacing: -0.5px;
 }
 
 .user-avatar-small {
@@ -162,10 +171,22 @@ body {
   width: 36px;
   height: 36px;
   background-color: #4CAF50;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 12px;
   font-weight: bold;
   letter-spacing: -0.3px;
+  text-transform: uppercase;
+  line-height: 1;
+  flex-shrink: 0;
 }
+
+/* ==========================================================================
+   Authentication Screen
+   ========================================================================== */
 
 .App {
   text-align: center;
@@ -221,11 +242,19 @@ body {
   transform: translateY(-1px);
 }
 
+/* ==========================================================================
+   Chat Application Layout
+   ========================================================================== */
+
 .chat-app {
   display: flex;
   height: 100vh;
   overflow: hidden;
 }
+
+/* ==========================================================================
+   Sidebar
+   ========================================================================== */
 
 .sidebar {
   width: 320px;
@@ -385,6 +414,10 @@ body {
   background-color: #34a853;
 }
 
+/* ==========================================================================
+   Main Content Area
+   ========================================================================== */
+
 .main-content {
   flex: 1;
   display: flex;
@@ -493,6 +526,11 @@ body {
   color: #666;
   text-transform: capitalize;
 }
+
+/* ==========================================================================
+   Messages Area
+   ========================================================================== */
+
 .messages-container {
   flex: 1;
   overflow-y: auto;
@@ -580,14 +618,14 @@ body {
   align-items: center;
   justify-content: center;
   font-size: 13px;
+  font-weight: 600;
   background-color: #f1f3f4;
   flex-shrink: 0;
   position: relative;
-   font-weight: 600;     
-  line-height: 1;        
-  letter-spacing: -0.3px; 
-  text-transform: uppercase; 
-  color: white;          
+  line-height: 1;
+  letter-spacing: -0.3px;
+  text-transform: uppercase;
+  color: white;
 }
 
 .message-item:not(.own-message) .message-avatar {
@@ -734,6 +772,10 @@ body {
 .unread-indicator span {
   padding: 0 12px;
 }
+
+/* ==========================================================================
+   Message Input Area
+   ========================================================================== */
 
 .message-input-area {
   padding: 16px 24px;
@@ -904,6 +946,10 @@ body {
   background-color: #1557b0;
 }
 
+/* ==========================================================================
+   Legacy Chat Container (backward compatibility)
+   ========================================================================== */
+
 .chat-container {
   display: flex;
   flex-direction: column;
@@ -930,6 +976,11 @@ body {
   font-size: 20px;
 }
 
+/* ==========================================================================
+   Real-time Features
+   ========================================================================== */
+
+/* Typing Indicator */
 .typing-indicator {
   display: flex;
   align-items: center;
@@ -1061,6 +1112,11 @@ body {
   background: #f5f5f5;
 }
 
+/* ==========================================================================
+   Modal Components
+   ========================================================================== */
+
+/* Search Results */
 .search-results-header {
   font-size: 14px;
   color: #666;
@@ -1103,6 +1159,7 @@ body {
   margin-top: 12px;
 }
 
+/* User Search */
 .search-container {
   position: relative;
   margin-bottom: 12px;
@@ -1139,6 +1196,7 @@ body {
   font-style: italic;
 }
 
+/* User Management */
 .user-status {
   font-size: 12px;
   color: #888;
@@ -1164,6 +1222,7 @@ body {
   margin-bottom: 2px;
 }
 
+/* Add User Buttons */
 .add-user-btn {
   padding: 6px 12px;
   border: 1px solid #ddd;
@@ -1192,6 +1251,7 @@ body {
   border-color: #ddd;
 }
 
+/* Selected Users Preview */
 .selected-users-preview {
   background-color: #f8f9fa;
   border: 1px solid #e0e0e0;
@@ -1376,6 +1436,10 @@ body {
   border-color: #999;
 }
 
+/* ==========================================================================
+   Responsive Design
+   ========================================================================== */
+
 @media (max-width: 768px) {
   .sidebar {
     width: 280px;
@@ -1420,9 +1484,9 @@ body {
   }
   
   .user-avatar-display {
-    width: 28px;
-    height: 28px;
-    font-size: 10px;
+    width: 32px;
+    height: 32px;
+    font-size: 11px;
   }
 
   .modal-content {
@@ -1461,6 +1525,10 @@ body {
   }
 }
 
+/* ==========================================================================
+   Utility Classes
+   ========================================================================== */
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -1489,6 +1557,11 @@ body {
   width: 1px;
 }
 
+/* ==========================================================================
+   CSS Icon Styles (using pseudo-elements)
+   ========================================================================== */
+
+/* Search Icon */
 .search-btn::before {
   content: '';
   width: 16px;
@@ -1509,6 +1582,7 @@ body {
   left: 20px;
 }
 
+/* Sign out Icon */
 .signout-btn::before {
   content: '';
   width: 12px;
@@ -1553,6 +1627,7 @@ body {
   left: 10px;
 }
 
+/* Navigation Icons */
 .icon-home::before {
   content: '';
   width: 16px;
@@ -1657,6 +1732,7 @@ body {
   left: 1px;
 }
 
+/* Attach Button Icon */
 .attach-btn::before {
   content: '';
   width: 3px;
@@ -1677,6 +1753,7 @@ body {
   left: 8px;
 }
 
+/* Emoji Button Icon */
 .emoji-btn {
   position: relative;
 }
@@ -1702,6 +1779,10 @@ body {
   left: 50%;
   transform: translate(-50%, -25%);
 }
+
+/* ==========================================================================
+   Print Styles
+   ========================================================================== */
 
 @media print {
   .sidebar,
@@ -1736,6 +1817,10 @@ body {
   }
 }
 
+/* ==========================================================================
+   Dark Mode Support (optional)
+   ========================================================================== */
+
 @media (prefers-color-scheme: dark) {
   :root {
     --bg-primary: #1a1a1a;
@@ -1745,6 +1830,7 @@ body {
     --border-color: #404040;
   }
 
+  /* Apply dark theme variables when needed */
   .dark-theme {
     background-color: var(--bg-primary);
     color: var(--text-primary);
