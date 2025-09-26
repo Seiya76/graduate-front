@@ -1,9 +1,22 @@
 // hooks/useRoomSubscription.js
 import { useEffect, useRef } from 'react';
 import { generateClient } from 'aws-amplify/api';
-import { onRoomUpdate } from '../graphql/subscriptions';
 
 const client = generateClient();
+
+// 修正されたサブスクリプションクエリ（updatedAtを削除）
+const ON_ROOM_UPDATE = `
+  subscription OnRoomUpdate($userId: ID!) {
+    onRoomUpdate(userId: $userId) {
+      roomId
+      roomName
+      createdBy
+      createdAt
+      lastMessageAt
+      memberCount
+    }
+  }
+`;
 
 export const useRoomSubscription = (currentUser, setUserRooms) => {
   const roomSubscriptionRef = useRef(null);
@@ -14,7 +27,7 @@ export const useRoomSubscription = (currentUser, setUserRooms) => {
     try {
       roomSubscriptionRef.current = client
         .graphql({
-          query: onRoomUpdate,
+          query: ON_ROOM_UPDATE,
           variables: { userId: currentUser.userId },
           authMode: "apiKey",
         })
@@ -32,11 +45,18 @@ export const useRoomSubscription = (currentUser, setUserRooms) => {
                 if (existingIndex >= 0) {
                   // 既存のルームを更新
                   const updated = [...prevRooms];
-                  updated[existingIndex] = updatedRoom;
+                  updated[existingIndex] = {
+                    ...updatedRoom,
+                    roomType: updated[existingIndex].roomType || 'group' // roomTypeを保持
+                  };
                   return updated;
                 } else {
                   // 新しいルームを追加
-                  return [updatedRoom, ...prevRooms];
+                  const newRoom = {
+                    ...updatedRoom,
+                    roomType: 'group' // デフォルトでgroup
+                  };
+                  return [newRoom, ...prevRooms];
                 }
               });
             }
