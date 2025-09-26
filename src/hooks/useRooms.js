@@ -87,8 +87,7 @@ export const useRooms = (currentUser) => {
       if (result.data.createDirectRoom) {
         const newRoom = {
           ...result.data.createDirectRoom,
-          // 削除された属性のフォールバック処理を削除
-          roomType: 'direct' // フロントエンドで設定
+          roomType: 'direct' // フロントエンドで設定（重要）
         };
         setUserRooms((prev) => [newRoom, ...prev]);
         return result.data.createDirectRoom;
@@ -101,17 +100,30 @@ export const useRooms = (currentUser) => {
 
   // ルームの分類（フロントエンドで判定）
   const groupRooms = userRooms.filter((room) => {
-    // roomTypeがない場合は、roomNameで判定
-    return room.roomType === "group" || 
-           (room.memberCount > 2) || 
-           (!room.roomName.includes('-') && room.memberCount !== 2);
+    // 1. フロントエンドで設定したroomTypeを優先
+    if (room.roomType === "group") return true;
+    if (room.roomType === "direct") return false;
+    
+    // 2. roomTypeがない場合の判定ロジック
+    // - memberCountが3人以上 → グループ
+    // - roomNameに'-'が含まれていない → グループ
+    // - memberCountが2人でroomNameに'-'が含まれる → ダイレクト
+    if (room.memberCount > 2) return true;
+    if (!room.roomName.includes('-')) return true;
+    
+    return false;
   });
   
   const directRooms = userRooms.filter((room) => {
-    // roomTypeがない場合は、roomNameで判定
-    return room.roomType === "direct" || 
-           (room.memberCount === 2) || 
-           room.roomName.includes('-');
+    // 1. フロントエンドで設定したroomTypeを優先
+    if (room.roomType === "direct") return true;
+    if (room.roomType === "group") return false;
+    
+    // 2. roomTypeがない場合の判定ロジック
+    // - memberCountが2人かつroomNameに'-'が含まれる → ダイレクト
+    if (room.memberCount === 2 && room.roomName.includes('-')) return true;
+    
+    return false;
   });
 
   return {
