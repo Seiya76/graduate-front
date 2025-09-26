@@ -6,13 +6,10 @@ export const createGroupRoom = /* GraphQL */ `
     createGroupRoom(input: $input) {
       roomId
       roomName
-      roomType
       createdBy
       createdAt
-      lastMessage
       lastMessageAt
       memberCount
-      updatedAt
       __typename
     }
   }
@@ -22,13 +19,10 @@ export const createDirectRoom = /* GraphQL */ `
     createDirectRoom(targetUserId: $targetUserId, createdBy: $createdBy) {
       roomId
       roomName
-      roomType
       createdBy
       createdAt
-      lastMessage
       lastMessageAt
       memberCount
-      updatedAt
       __typename
     }
   }
