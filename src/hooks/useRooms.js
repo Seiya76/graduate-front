@@ -60,8 +60,8 @@ export const useRooms = (currentUser) => {
         const createdRoom = result.data.createGroupRoom;
         const newRoom = {
           ...createdRoom,
-          lastMessage: createdRoom.lastMessage || "未入力",
-          lastMessageAt: createdRoom.lastMessageAt || createdRoom.createdAt,
+          // 削除された属性のフォールバック処理を削除
+          roomType: 'group' // フロントエンドで設定
         };
         setUserRooms((prev) => [newRoom, ...prev]);
         return createdRoom;
@@ -87,10 +87,8 @@ export const useRooms = (currentUser) => {
       if (result.data.createDirectRoom) {
         const newRoom = {
           ...result.data.createDirectRoom,
-          lastMessage: result.data.createDirectRoom.lastMessage || "未入力",
-          lastMessageAt:
-            result.data.createDirectRoom.lastMessageAt ||
-            result.data.createDirectRoom.createdAt,
+          // 削除された属性のフォールバック処理を削除
+          roomType: 'direct' // フロントエンドで設定
         };
         setUserRooms((prev) => [newRoom, ...prev]);
         return result.data.createDirectRoom;
@@ -101,9 +99,20 @@ export const useRooms = (currentUser) => {
     }
   };
 
-  // ルームの分類
-  const groupRooms = userRooms.filter((room) => room.roomType === "group");
-  const directRooms = userRooms.filter((room) => room.roomType === "direct");
+  // ルームの分類（フロントエンドで判定）
+  const groupRooms = userRooms.filter((room) => {
+    // roomTypeがない場合は、roomNameで判定
+    return room.roomType === "group" || 
+           (room.memberCount > 2) || 
+           (!room.roomName.includes('-') && room.memberCount !== 2);
+  });
+  
+  const directRooms = userRooms.filter((room) => {
+    // roomTypeがない場合は、roomNameで判定
+    return room.roomType === "direct" || 
+           (room.memberCount === 2) || 
+           room.roomName.includes('-');
+  });
 
   return {
     userRooms,

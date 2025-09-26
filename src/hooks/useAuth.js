@@ -13,8 +13,6 @@ const GET_USER_BY_EMAIL = `
       email
       emailVerified
       nickname
-      status
-      updatedAt
       __typename
     }
   }
@@ -78,7 +76,6 @@ export const useCurrentUser = (oidcUser) => {
                    oidcUser.profile.preferred_username || 
                    email?.split("@")[0],
           email: email,
-          status: "active",
         };
         setCurrentUser(fallbackUser);
       } catch (error) {
@@ -90,7 +87,6 @@ export const useCurrentUser = (oidcUser) => {
                    oidcUser.profile.preferred_username || 
                    oidcUser.profile.email?.split("@")[0],
           email: oidcUser.profile.email,
-          status: "active",
         };
         setCurrentUser(fallbackUser);
       } finally {
