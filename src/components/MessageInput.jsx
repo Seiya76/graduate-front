@@ -1,4 +1,3 @@
-// components/MessageInput.jsx
 import React, { useState, useCallback } from 'react';
 
 const MessageInput = ({ 

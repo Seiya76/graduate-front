@@ -1,4 +1,3 @@
-// hooks/useUserSearch.js
 import { useState, useEffect } from 'react';
 import { generateClient } from 'aws-amplify/api';
 import { searchUsers } from '../graphql/queries';
@@ -17,7 +16,7 @@ export const useUserSearch = (currentUser) => {
       } else {
         setSearchResults([]);
       }
-    }, 500); // デバウンス処理
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [searchTerm, currentUser]);

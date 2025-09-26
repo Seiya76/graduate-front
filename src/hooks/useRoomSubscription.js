@@ -1,10 +1,8 @@
-// hooks/useRoomSubscription.js
 import { useEffect, useRef } from 'react';
 import { generateClient } from 'aws-amplify/api';
 
 const client = generateClient();
 
-// 修正されたサブスクリプションクエリ（updatedAtを削除）
 const ON_ROOM_UPDATE = `
   subscription OnRoomUpdate($userId: ID!) {
     onRoomUpdate(userId: $userId) {
@@ -54,7 +52,7 @@ export const useRoomSubscription = (currentUser, setUserRooms) => {
                   // 新しいルームを追加
                   const newRoom = {
                     ...updatedRoom,
-                    roomType: 'group' // デフォルトでgroup
+                    roomType: 'group'
                   };
                   return [newRoom, ...prevRooms];
                 }

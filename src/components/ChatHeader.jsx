@@ -1,4 +1,3 @@
-// components/ChatHeader.jsx
 import React from 'react';
 
 const ChatHeader = ({ 

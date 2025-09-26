@@ -1,4 +1,3 @@
-// hooks/useRooms.js
 import { useState, useEffect } from 'react';
 import { generateClient } from 'aws-amplify/api';
 import { getUserRooms } from '../graphql/queries';
@@ -60,7 +59,6 @@ export const useRooms = (currentUser) => {
         const createdRoom = result.data.createGroupRoom;
         const newRoom = {
           ...createdRoom,
-          // 削除された属性のフォールバック処理を削除
           roomType: 'group' // フロントエンドで設定
         };
         setUserRooms((prev) => [newRoom, ...prev]);
@@ -98,16 +96,12 @@ export const useRooms = (currentUser) => {
     }
   };
 
-  // ルームの分類（フロントエンドで判定）
+  // ルームの分類
   const groupRooms = userRooms.filter((room) => {
-    // 1. フロントエンドで設定したroomTypeを優先
+
     if (room.roomType === "group") return true;
     if (room.roomType === "direct") return false;
     
-    // 2. roomTypeがない場合の判定ロジック
-    // - memberCountが3人以上 → グループ
-    // - roomNameに'-'が含まれていない → グループ
-    // - memberCountが2人でroomNameに'-'が含まれる → ダイレクト
     if (room.memberCount > 2) return true;
     if (!room.roomName.includes('-')) return true;
     
@@ -115,12 +109,10 @@ export const useRooms = (currentUser) => {
   });
   
   const directRooms = userRooms.filter((room) => {
-    // 1. フロントエンドで設定したroomTypeを優先
+
     if (room.roomType === "direct") return true;
     if (room.roomType === "group") return false;
     
-    // 2. roomTypeがない場合の判定ロジック
-    // - memberCountが2人かつroomNameに'-'が含まれる → ダイレクト
     if (room.memberCount === 2 && room.roomName.includes('-')) return true;
     
     return false;

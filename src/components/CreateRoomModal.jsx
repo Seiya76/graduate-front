@@ -1,4 +1,3 @@
-// components/CreateRoomModal.jsx
 import React from 'react';
 
 const CreateRoomModal = ({

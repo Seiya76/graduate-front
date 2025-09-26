@@ -1,6 +1,3 @@
-/* eslint-disable */
-// this is an auto generated file. This will be overwritten
-
 export const onMessageSent = /* GraphQL */ `
   subscription OnMessageSent($roomId: ID!) {
     onMessageSent(roomId: $roomId) {

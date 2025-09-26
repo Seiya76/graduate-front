@@ -1,4 +1,3 @@
-// App.js - リファクタリング版
 import React, { useState, useEffect, useMemo } from "react";
 import logo from "./logo.svg";
 import "./App.css";
@@ -7,14 +6,14 @@ import { Amplify } from "aws-amplify";
 import { generateClient } from "aws-amplify/api";
 import config from "./aws-exports.js";
 
-// カスタムフック
+// 各種機能をインポート
 import { useCurrentUser } from "./hooks/useAuth";
 import { useRooms } from "./hooks/useRooms";
 import { useMessages } from "./hooks/useMessages";
 import { useUserSearch } from "./hooks/useUserSearch";
 import { useRoomSubscription } from "./hooks/useRoomSubscription";
 
-// コンポーネント
+// 画面の部品インポート
 import Sidebar from "./components/Sidebar";
 import ChatHeader from "./components/ChatHeader";
 import MessageList from "./components/MessageList";
@@ -31,7 +30,7 @@ function requestNotificationPermission() {
   }
 }
 
-// ChatScreenコンポーネント
+// ChatScreen(画面)
 function ChatScreen({ user, onSignOut }) {
   const [selectedSpace, setSelectedSpace] = useState("ホーム");
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
@@ -71,7 +70,7 @@ function ChatScreen({ user, onSignOut }) {
     sendMessage,
   } = useMessages(selectedRoomId, currentUser);
 
-  // ユーザー検索（モーダル用）
+  // ユーザー検索
   const {
     searchTerm: modalSearchTerm,
     setSearchTerm: setModalSearchTerm,
@@ -271,7 +270,7 @@ function ChatScreen({ user, onSignOut }) {
   );
 }
 
-// メインのAppコンポーネント
+// メイン
 function App() {
   const auth = useAuth();
 

@@ -1,4 +1,3 @@
-// hooks/useMessages.js
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { generateClient } from 'aws-amplify/api';
 import { getRecentMessages } from '../graphql/queries';

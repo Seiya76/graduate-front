@@ -1,4 +1,3 @@
-// hooks/useAuth.js
 import { useState, useEffect } from 'react';
 import { generateClient } from 'aws-amplify/api';
 import { getUser } from '../graphql/queries';
@@ -73,8 +72,8 @@ export const useCurrentUser = (oidcUser) => {
         const fallbackUser = {
           userId: oidcSub,
           nickname: oidcUser.profile.name || 
-                   oidcUser.profile.preferred_username || 
-                   email?.split("@")[0],
+                  oidcUser.profile.preferred_username || 
+                  email?.split("@")[0],
           email: email,
         };
         setCurrentUser(fallbackUser);
@@ -84,8 +83,8 @@ export const useCurrentUser = (oidcUser) => {
         const fallbackUser = {
           userId: oidcUser.profile.sub,
           nickname: oidcUser.profile.name || 
-                   oidcUser.profile.preferred_username || 
-                   oidcUser.profile.email?.split("@")[0],
+                  oidcUser.profile.preferred_username || 
+                  oidcUser.profile.email?.split("@")[0],
           email: oidcUser.profile.email,
         };
         setCurrentUser(fallbackUser);
