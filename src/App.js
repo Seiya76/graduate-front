@@ -268,6 +268,8 @@ function ChatScreen({ user, onSignOut }) {
       </div>
     </div>
   );
+
+  
 }
 
 // メイン

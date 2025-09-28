@@ -13,10 +13,17 @@ export const useRooms = (currentUser) => {
   // ルーム一覧の取得
   useEffect(() => {
     const fetchUserRooms = async () => {
-      if (!currentUser?.userId) return;
+      if (!currentUser?.userId) {
+        console.log("🔍 useRooms: currentUser or userId is missing", currentUser);
+        return;
+      }
 
+      console.log("🔍 useRooms: Starting to fetch rooms for user", currentUser.userId);
       setIsLoadingRooms(true);
+      setRoomError(null);
+      
       try {
+        console.log("🔍 useRooms: Making GraphQL request...");
         const result = await client.graphql({
           query: getUserRooms,
           variables: {
@@ -26,12 +33,37 @@ export const useRooms = (currentUser) => {
           authMode: "apiKey",
         });
 
-        if (result.data.getUserRooms?.items) {
-          setUserRooms(result.data.getUserRooms.items);
+        console.log("🔍 useRooms: GraphQL response received", result);
+        console.log("🔍 useRooms: Result data structure", JSON.stringify(result.data, null, 2));
+
+        if (result.data?.getUserRooms?.items) {
+          const rooms = result.data.getUserRooms.items;
+          console.log("🔍 useRooms: Found rooms", rooms.length, rooms);
+          setUserRooms(rooms);
+          
+          // 各ルームの詳細をログ出力
+          rooms.forEach((room, index) => {
+            console.log(`🔍 Room ${index + 1}:`, {
+              roomId: room.roomId,
+              roomName: room.roomName,
+              memberCount: room.memberCount,
+              roomType: room.roomType,
+              createdBy: room.createdBy,
+              lastMessageAt: room.lastMessageAt
+            });
+          });
+        } else {
+          console.log("🔍 useRooms: No rooms found in response", result.data);
+          setUserRooms([]);
         }
       } catch (error) {
-        console.error("Error fetching user rooms:", error);
-        setRoomError('ルーム一覧の取得に失敗しました');
+        console.error("🔍 useRooms: Error fetching user rooms", error);
+        console.error("🔍 useRooms: Error details", {
+          message: error.message,
+          errors: error.errors,
+          graphQLErrors: error.graphQLErrors
+        });
+        setRoomError('ルーム一覧の取得に失敗しました: ' + error.message);
       } finally {
         setIsLoadingRooms(false);
       }
@@ -42,6 +74,8 @@ export const useRooms = (currentUser) => {
 
   // グループルーム作成
   const createNewGroupRoom = async (roomName, memberUserIds, createdBy) => {
+    console.log("🔍 useRooms: Creating group room", { roomName, memberUserIds, createdBy });
+    
     try {
       const result = await client.graphql({
         query: createGroupRoom,
@@ -55,23 +89,31 @@ export const useRooms = (currentUser) => {
         authMode: "apiKey",
       });
 
+      console.log("🔍 useRooms: Group room created", result);
+
       if (result.data.createGroupRoom) {
         const createdRoom = result.data.createGroupRoom;
         const newRoom = {
           ...createdRoom,
-          roomType: 'group' // フロントエンドで設定
+          roomType: 'group'
         };
-        setUserRooms((prev) => [newRoom, ...prev]);
+        setUserRooms((prev) => {
+          const updated = [newRoom, ...prev];
+          console.log("🔍 useRooms: Updated rooms after creation", updated);
+          return updated;
+        });
         return createdRoom;
       }
     } catch (error) {
-      console.error("Error creating group room:", error);
+      console.error("🔍 useRooms: Error creating group room", error);
       throw error;
     }
   };
 
   // ダイレクトルーム作成
   const createNewDirectRoom = async (targetUserId, createdBy) => {
+    console.log("🔍 useRooms: Creating direct room", { targetUserId, createdBy });
+    
     try {
       const result = await client.graphql({
         query: createDirectRoom,
@@ -82,40 +124,60 @@ export const useRooms = (currentUser) => {
         authMode: "apiKey",
       });
 
+      console.log("🔍 useRooms: Direct room created", result);
+
       if (result.data.createDirectRoom) {
         const newRoom = {
           ...result.data.createDirectRoom,
-          roomType: 'direct' // フロントエンドで設定（重要）
+          roomType: 'direct'
         };
-        setUserRooms((prev) => [newRoom, ...prev]);
+        setUserRooms((prev) => {
+          const updated = [newRoom, ...prev];
+          console.log("🔍 useRooms: Updated rooms after DM creation", updated);
+          return updated;
+        });
         return result.data.createDirectRoom;
       }
     } catch (error) {
-      console.error("Error creating direct room:", error);
+      console.error("🔍 useRooms: Error creating direct room", error);
       throw error;
     }
   };
 
   // ルームの分類
   const groupRooms = userRooms.filter((room) => {
-
-    if (room.roomType === "group") return true;
-    if (room.roomType === "direct") return false;
+    const isGroup = room.roomType === "group" || 
+                   room.memberCount > 2 || 
+                   !room.roomName.includes('-');
     
-    if (room.memberCount > 2) return true;
-    if (!room.roomName.includes('-')) return true;
+    console.log(`🔍 Room "${room.roomName}" classified as group:`, isGroup, {
+      roomType: room.roomType,
+      memberCount: room.memberCount,
+      hasHyphen: room.roomName.includes('-')
+    });
     
-    return false;
+    return isGroup;
   });
   
   const directRooms = userRooms.filter((room) => {
+    const isDirect = room.roomType === "direct" || 
+                    (room.memberCount === 2 && room.roomName.includes('-'));
+    
+    console.log(`🔍 Room "${room.roomName}" classified as direct:`, isDirect, {
+      roomType: room.roomType,
+      memberCount: room.memberCount,
+      hasHyphen: room.roomName.includes('-')
+    });
+    
+    return isDirect;
+  });
 
-    if (room.roomType === "direct") return true;
-    if (room.roomType === "group") return false;
-    
-    if (room.memberCount === 2 && room.roomName.includes('-')) return true;
-    
-    return false;
+  console.log("🔍 useRooms: Final classification", {
+    totalRooms: userRooms.length,
+    groupRooms: groupRooms.length,
+    directRooms: directRooms.length,
+    groupRoomNames: groupRooms.map(r => r.roomName),
+    directRoomNames: directRooms.map(r => r.roomName)
   });
 
   return {
