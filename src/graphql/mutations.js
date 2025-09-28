@@ -14,19 +14,7 @@ export const createGroupRoom = /* GraphQL */ `
     }
   }
 `;
-export const createDirectRoom = /* GraphQL */ `
-  mutation CreateDirectRoom($targetUserId: ID!, $createdBy: ID!) {
-    createDirectRoom(targetUserId: $targetUserId, createdBy: $createdBy) {
-      roomId
-      roomName
-      createdBy
-      createdAt
-      lastMessageAt
-      memberCount
-      __typename
-    }
-  }
-`;
+
 export const joinRoom = /* GraphQL */ `
   mutation JoinRoom($roomId: ID!, $userId: ID!) {
     joinRoom(roomId: $roomId, userId: $userId) {

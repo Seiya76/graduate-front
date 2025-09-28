@@ -47,7 +47,6 @@ function ChatScreen({ user, onSignOut }) {
     directRooms,
     setUserRooms,
     createNewGroupRoom,
-    createNewDirectRoom,
     isLoadingRooms,
     roomError,
   } = useRooms(currentUser);
@@ -76,14 +75,6 @@ function ChatScreen({ user, onSignOut }) {
     setSearchTerm: setModalSearchTerm,
     searchResults: modalSearchResults,
     isSearching: isModalSearching,
-  } = useUserSearch(currentUser);
-
-  // ユーザー検索（DM用）
-  const {
-    searchTerm: dmSearchTerm,
-    setSearchTerm: setDmSearchTerm,
-    searchResults: dmSearchResults,
-    isSearching: isDmSearching,
   } = useUserSearch(currentUser);
 
   // ルーム更新のサブスクリプション
@@ -148,22 +139,6 @@ function ChatScreen({ user, onSignOut }) {
     }
   };
 
-  // ダイレクトルーム作成
-  const handleCreateDirectRoom = async (targetUserId) => {
-    if (!currentUser?.userId || !targetUserId) return;
-
-    try {
-      const createdRoom = await createNewDirectRoom(
-        targetUserId,
-        currentUser.userId
-      );
-      setSelectedSpace(createdRoom.roomName);
-    } catch (error) {
-      console.error("Error creating direct room:", error);
-      alert("ダイレクトルーム作成でエラーが発生しました: " + error.message);
-    }
-  };
-
   // モーダルリセット
   const resetModal = () => {
     setIsCreatingRoom(false);
@@ -192,10 +167,6 @@ function ChatScreen({ user, onSignOut }) {
         directRooms={directRooms}
         isCreatingRoom={isCreatingRoom}
         setIsCreatingRoom={setIsCreatingRoom}
-        dmSearchTerm={dmSearchTerm}
-        setDmSearchTerm={setDmSearchTerm}
-        dmSearchResults={dmSearchResults}
-        createDirectRoom_func={handleCreateDirectRoom}
         setDmSearchResults={() => {}}
         onSignOut={onSignOut}
       />

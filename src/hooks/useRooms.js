@@ -105,37 +105,6 @@ export const useRooms = (currentUser) => {
     }
   };
 
-  // ダイレクトルーム作成
-  const createNewDirectRoom = async (targetUserId, createdBy) => {
-    console.log("🔍 useRooms: Creating direct room", { targetUserId, createdBy });
-    
-    try {
-      const result = await client.graphql({
-        query: createDirectRoom,
-        variables: {
-          targetUserId: targetUserId,
-          createdBy: createdBy,
-        },
-        authMode: "apiKey",
-      });
-
-      console.log("🔍 useRooms: Direct room created", result);
-
-      if (result.data.createDirectRoom) {
-        const newRoom = result.data.createDirectRoom;
-        setUserRooms((prev) => {
-          const updated = [newRoom, ...prev];
-          console.log("🔍 useRooms: Updated rooms after DM creation", updated);
-          return updated;
-        });
-        return result.data.createDirectRoom;
-      }
-    } catch (error) {
-      console.error("🔍 useRooms: Error creating direct room", error);
-      throw error;
-    }
-  };
-
   // ルームの分類（memberCountのみを使用）
   const groupRooms = userRooms.filter((room) => {
     // memberCountが3以上、またはmemberCountが未定義/nullの場合はグループルーム
@@ -147,33 +116,18 @@ export const useRooms = (currentUser) => {
     
     return isGroup;
   });
-  
-  const directRooms = userRooms.filter((room) => {
-    // memberCountが正確に2の場合のみダイレクトルーム
-    const isDirect = room.memberCount === 2;
-    
-    console.log(`🔍 Room "${room.roomName}" classified as direct:`, isDirect, {
-      memberCount: room.memberCount
-    });
-    
-    return isDirect;
-  });
 
   console.log("🔍 useRooms: Final classification", {
     totalRooms: userRooms.length,
     groupRooms: groupRooms.length,
-    directRooms: directRooms.length,
     groupRoomNames: groupRooms.map(r => r.roomName),
-    directRoomNames: directRooms.map(r => r.roomName)
   });
 
   return {
     userRooms,
     groupRooms,
-    directRooms,
     setUserRooms,
     createNewGroupRoom,
-    createNewDirectRoom,
     isLoadingRooms,
     roomError,
   };
