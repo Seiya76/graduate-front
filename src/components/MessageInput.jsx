@@ -12,11 +12,12 @@ const MessageInput = ({
     if (!newMessage.trim() || isSendingMessage) return;
     
     const messageContent = newMessage.trim();
-    const success = await onSendMessage(messageContent);
     
-    if (success) {
-      setNewMessage("");
-    }
+    // メッセージを送信前に即座に入力フィールドをクリア
+    setNewMessage("");
+    
+    // メッセージ送信（バックグラウンドで実行）
+    onSendMessage(messageContent);
   };
 
   const handleKeyPress = useCallback((e) => {
@@ -40,22 +41,15 @@ const MessageInput = ({
           placeholder={`${selectedSpace}にメッセージを送信`}
           className="message-input"
           rows="1"
-          disabled={isSendingMessage}
         />
         <div className="input-actions">
           <button
             onClick={handleSend}
-            className={`send-btn ${
-              newMessage.trim() && !isSendingMessage ? "active" : ""
-            }`}
-            disabled={!newMessage.trim() || isSendingMessage}
-            title={isSendingMessage ? "送信中..." : "送信"}
+            className={`send-btn ${newMessage.trim() ? "active" : ""}`}
+            disabled={!newMessage.trim()}
+            title="送信"
           >
-            {isSendingMessage ? (
-              <span className="loading-spinner-small"></span>
-            ) : (
-              ""
-            )}
+            ▶
           </button>
         </div>
       </div>
