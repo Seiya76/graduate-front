@@ -31,19 +31,6 @@ export const getRoom = /* GraphQL */ `
     }
   }
 `;
-export const getRecentMessages = /* GraphQL */ `
-  query GetRecentMessages($roomId: ID!) {
-    getRecentMessages(roomId: $roomId) {
-      messageId
-      roomId
-      userId
-      nickname
-      content
-      createdAt
-      __typename
-    }
-  }
-`;
 export const getCurrentUser = /* GraphQL */ `
   query GetCurrentUser {
     getCurrentUser {
@@ -79,6 +66,19 @@ export const searchUsers = /* GraphQL */ `
         nickname
         __typename
       }
+      __typename
+    }
+  }
+`;
+export const getRecentMessages = /* GraphQL */ `
+  query GetRecentMessages($roomId: ID!) {
+    getRecentMessages(roomId: $roomId) {
+      messageId
+      roomId
+      userId
+      nickname
+      content
+      createdAt
       __typename
     }
   }
