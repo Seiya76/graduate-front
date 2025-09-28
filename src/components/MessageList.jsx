@@ -12,7 +12,6 @@ const MessageList = ({
     return (
       <div className="messages-list">
         <div className="welcome-message">
-          <h3>チャットへようこそ！</h3>
           <p>
             左側のルーム一覧からチャットルームを選択するか、新しいチャットを作成してください。
           </p>

@@ -70,7 +70,7 @@ export const useMessages = (selectedRoomId, currentUser) => {
 
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    // 楽観的UI更新
+    // UI更新
     const optimisticMessage = {
       id: tempId,
       messageId: tempId,

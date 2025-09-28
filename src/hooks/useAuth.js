@@ -68,7 +68,6 @@ export const useCurrentUser = (oidcUser) => {
           }
         }
 
-        // フォールバック
         const fallbackUser = {
           userId: oidcSub,
           nickname: oidcUser.profile.name || 

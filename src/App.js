@@ -211,7 +211,7 @@ function ChatScreen({ user, onSignOut }) {
         {/* 接続状態表示 */}
         {!isConnected && selectedSpace !== "ホーム" && (
           <div className="connection-warning">
-            リアルタイム通信が切断されています。再接続を試みています...
+            リアルタイム通信が切断されています。
           </div>
         )}
 
