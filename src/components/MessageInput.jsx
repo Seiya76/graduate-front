@@ -49,12 +49,12 @@ const MessageInput = ({
               newMessage.trim() && !isSendingMessage ? "active" : ""
             }`}
             disabled={!newMessage.trim() || isSendingMessage}
-            title={isSendingMessage ? "送信中..." : "送信"}
+            title="送信"
           >
             {isSendingMessage ? (
               <span className="loading-spinner-small"></span>
             ) : (
-              ""
+              "→"
             )}
           </button>
         </div>
