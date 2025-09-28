@@ -10,6 +10,19 @@ export const useRooms = (currentUser) => {
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
   const [roomError, setRoomError] = useState(null);
 
+  // ルーム分類部分の前に追加
+console.log("🔍 All fetched rooms:", userRooms);
+console.log("🔍 Room details:", userRooms.map(room => ({
+  roomId: room.roomId,
+  roomName: room.roomName,
+  roomType: room.roomType,
+  memberCount: room.memberCount,
+  hasHyphen: room.roomName?.includes('-')
+})));
+
+// より寛容な分類条件でテスト
+const allRoomsAsGroup = userRooms; // 一時的に全ルームをグループとして表示
+
   // ルーム一覧の取得
   useEffect(() => {
     const fetchUserRooms = async () => {
