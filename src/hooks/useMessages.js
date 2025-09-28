@@ -184,11 +184,6 @@ export const useMessages = (selectedRoomId, currentUser) => {
 
                 return updated;
               });
-
-              // 通知
-              if (newMsg.userId !== currentUser.userId && document.hidden) {
-                showNotification(newMsg);
-              }
             }
           },
           error: (error) => {
@@ -246,15 +241,3 @@ export const useMessages = (selectedRoomId, currentUser) => {
     fetchMessages,
   };
 };
-
-// 通知を表示
-function showNotification(message) {
-  if ("Notification" in window && Notification.permission === "granted") {
-    new Notification(`${message.nickname || "新着メッセージ"}`, {
-      body: message.content,
-      icon: "/chat-icon.png",
-      tag: message.messageId,
-      renotify: false,
-    });
-  }
-}
