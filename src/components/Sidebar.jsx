@@ -42,10 +42,11 @@ const Sidebar = ({
         </div>
         <div className="header-actions">
           <button
-            className="icon-btn signout-btn"
+            className="signout-btn"
             onClick={onSignOut}
-            title="サインアウト"
-          ></button>
+          >
+            サインアウト
+          </button>
         </div>
       </div>
 
