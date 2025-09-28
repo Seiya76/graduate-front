@@ -23,6 +23,13 @@ import CreateRoomModal from "./components/CreateRoomModal";
 Amplify.configure(config);
 const client = generateClient();
 
+// 通知権限のリクエスト
+function requestNotificationPermission() {
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+}
+
 // ChatScreen(画面)
 function ChatScreen({ user, onSignOut }) {
   const [selectedSpace, setSelectedSpace] = useState("ホーム");
@@ -81,6 +88,11 @@ function ChatScreen({ user, onSignOut }) {
 
   // ルーム更新のサブスクリプション
   useRoomSubscription(currentUser, setUserRooms);
+
+  // 通知権限のリクエスト
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []);
 
   // 表示名の取得
   const getDisplayName = () => {
