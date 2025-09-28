@@ -5,8 +5,7 @@ const MessageList = ({
   messagesEndRef, 
   isLoadingMessages,
   selectedSpace,
-  groupRooms,
-  directRooms
+  groupRooms
 }) => {
   
   if (selectedSpace === "ホーム") {
@@ -21,10 +20,6 @@ const MessageList = ({
             <div className="stat-item">
               <strong>{groupRooms.length}</strong>
               <span>グループルーム</span>
-            </div>
-            <div className="stat-item">
-              <strong>{directRooms.length}</strong>
-              <span>ダイレクトメッセージ</span>
             </div>
           </div>
         </div>

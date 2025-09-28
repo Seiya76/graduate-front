@@ -44,7 +44,6 @@ function ChatScreen({ user, onSignOut }) {
   const {
     userRooms,
     groupRooms,
-    directRooms,
     setUserRooms,
     createNewGroupRoom,
     isLoadingRooms,
@@ -164,7 +163,6 @@ function ChatScreen({ user, onSignOut }) {
         selectedSpace={selectedSpace}
         setSelectedSpace={setSelectedSpace}
         groupRooms={groupRooms}
-        directRooms={directRooms}
         isCreatingRoom={isCreatingRoom}
         setIsCreatingRoom={setIsCreatingRoom}
         setDmSearchResults={() => {}}
@@ -225,7 +223,6 @@ function ChatScreen({ user, onSignOut }) {
             isLoadingMessages={isLoadingMessages}
             selectedSpace={selectedSpace}
             groupRooms={groupRooms}
-            directRooms={directRooms}
           />
         </div>
 
