@@ -1,15 +1,5 @@
-export const onMessageSent = /* GraphQL */ `
-  subscription OnMessageSent($roomId: ID!) {
-    onMessageSent(roomId: $roomId) {
-      messageId
-      roomId
-      userId
-      nickname
-      content
-      createdAt
-    }
-  }
-`;
+/* eslint-disable */
+// this is an auto generated file. This will be overwritten
 
 export const onRoomUpdate = /* GraphQL */ `
   subscription OnRoomUpdate($userId: ID!) {
@@ -20,18 +10,20 @@ export const onRoomUpdate = /* GraphQL */ `
       createdAt
       lastMessageAt
       memberCount
+      __typename
     }
   }
 `;
-
-export const onUserTyping = `
-  subscription OnUserTyping($roomId: String!) {
-    onUserTyping(roomId: $roomId) {
+export const onMessageSent = /* GraphQL */ `
+  subscription OnMessageSent($roomId: ID!) {
+    onMessageSent(roomId: $roomId) {
+      messageId
       roomId
       userId
       nickname
-      isTyping
+      content
+      createdAt
+      __typename
     }
   }
 `;
-
