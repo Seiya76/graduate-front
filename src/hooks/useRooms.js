@@ -10,19 +10,6 @@ export const useRooms = (currentUser) => {
   const [isLoadingRooms, setIsLoadingRooms] = useState(false);
   const [roomError, setRoomError] = useState(null);
 
-  // ルーム分類部分の前に追加
-console.log("🔍 All fetched rooms:", userRooms);
-console.log("🔍 Room details:", userRooms.map(room => ({
-  roomId: room.roomId,
-  roomName: room.roomName,
-  roomType: room.roomType,
-  memberCount: room.memberCount,
-  hasHyphen: room.roomName?.includes('-')
-})));
-
-// より寛容な分類条件でテスト
-const allRoomsAsGroup = userRooms; // 一時的に全ルームをグループとして表示
-
   // ルーム一覧の取得
   useEffect(() => {
     const fetchUserRooms = async () => {
@@ -60,7 +47,6 @@ const allRoomsAsGroup = userRooms; // 一時的に全ルームをグループと
               roomId: room.roomId,
               roomName: room.roomName,
               memberCount: room.memberCount,
-              roomType: room.roomType,
               createdBy: room.createdBy,
               lastMessageAt: room.lastMessageAt
             });
@@ -106,12 +92,8 @@ const allRoomsAsGroup = userRooms; // 一時的に全ルームをグループと
 
       if (result.data.createGroupRoom) {
         const createdRoom = result.data.createGroupRoom;
-        const newRoom = {
-          ...createdRoom,
-          roomType: 'group'
-        };
         setUserRooms((prev) => {
-          const updated = [newRoom, ...prev];
+          const updated = [createdRoom, ...prev];
           console.log("🔍 useRooms: Updated rooms after creation", updated);
           return updated;
         });
@@ -140,10 +122,7 @@ const allRoomsAsGroup = userRooms; // 一時的に全ルームをグループと
       console.log("🔍 useRooms: Direct room created", result);
 
       if (result.data.createDirectRoom) {
-        const newRoom = {
-          ...result.data.createDirectRoom,
-          roomType: 'direct'
-        };
+        const newRoom = result.data.createDirectRoom;
         setUserRooms((prev) => {
           const updated = [newRoom, ...prev];
           console.log("🔍 useRooms: Updated rooms after DM creation", updated);
@@ -157,29 +136,24 @@ const allRoomsAsGroup = userRooms; // 一時的に全ルームをグループと
     }
   };
 
-  // ルームの分類
+  // ルームの分類（memberCountのみを使用）
   const groupRooms = userRooms.filter((room) => {
-    const isGroup = room.roomType === "group" || 
-                   room.memberCount > 2 || 
-                   !room.roomName.includes('-');
+    // memberCountが3以上、またはmemberCountが未定義/nullの場合はグループルーム
+    const isGroup = !room.memberCount || room.memberCount !== 2;
     
     console.log(`🔍 Room "${room.roomName}" classified as group:`, isGroup, {
-      roomType: room.roomType,
-      memberCount: room.memberCount,
-      hasHyphen: room.roomName.includes('-')
+      memberCount: room.memberCount
     });
     
     return isGroup;
   });
   
   const directRooms = userRooms.filter((room) => {
-    const isDirect = room.roomType === "direct" || 
-                    (room.memberCount === 2 && room.roomName.includes('-'));
+    // memberCountが正確に2の場合のみダイレクトルーム
+    const isDirect = room.memberCount === 2;
     
     console.log(`🔍 Room "${room.roomName}" classified as direct:`, isDirect, {
-      roomType: room.roomType,
-      memberCount: room.memberCount,
-      hasHyphen: room.roomName.includes('-')
+      memberCount: room.memberCount
     });
     
     return isDirect;
