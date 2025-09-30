@@ -85,14 +85,6 @@ const Sidebar = ({
               <span className="nav-icon icon-team"></span>
               <span className="nav-text">{room.roomName}</span>
               <span className="member-count">({room.memberCount})</span>
-              {room.lastMessageAt && room.lastMessageAt !== "1900-01-01T00:00:00.000Z" && (
-                <span className="last-message-time">
-                  {new Date(room.lastMessageAt).toLocaleTimeString("ja-JP", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
-              )}
             </div>
           ))}
         </div>
